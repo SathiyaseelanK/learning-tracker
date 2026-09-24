@@ -514,6 +514,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
   <div class="view" id="view-habits"></div>
   <div class="view" id="view-plans"></div>
   <div class="view" id="view-books"></div>
+  <div class="view" id="view-finance"></div>
   <div class="view" id="view-quotes"></div>
 
   <!-- BOTTOM NAV -->
@@ -532,6 +533,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
     </button>
     <button class="nav-item" id="nav-books" onclick="switchView('books')">
       <div class="nav-item-icon">📖</div>Books
+    </button>
+    <button class="nav-item" id="nav-finance" onclick="switchView('finance')">
+      <div class="nav-item-icon">💰</div>Finance
     </button>
   </nav>
 </div>
@@ -1731,6 +1735,7 @@ function switchView(v){
   if(v==='dashboard') renderDashboard();
   if(v==='plans')    renderPlans();
   if(v==='books')    renderBooks();
+  if(v==='finance')  renderFinance();
   if(v==='quotes')   renderQuotes();
   if(v==='habits'){  _habitsView='list'; renderHabits(); }
 }
@@ -5215,9 +5220,9 @@ function shiftFinancePeriod(dir){
   if(_financeView==='daily') d.setDate(d.getDate()+dir);
   if(_financeView==='monthly') d.setMonth(d.getMonth()+dir);
   if(_financeView==='yearly') d.setFullYear(d.getFullYear()+dir);
-  _financeDate=d;showFinance();
+  _financeDate=d;renderFinance();
 }
-function setFinanceView(view){_financeView=view;showFinance();}
+function setFinanceView(view){_financeView=view;renderFinance();}
 
 function expenseBreakdown(txs){
   const expenses=txs.filter(t=>t.type==='expense');
@@ -5242,14 +5247,20 @@ function donutGradient(breakdown){
   return stops.join(',');
 }
 
-function showFinance(){
+function renderFinance(){
+  const el=document.getElementById('view-finance');
   const txs=txInPeriod(_financeView,_financeDate);
   const totals=periodTotals(txs);
   const breakdown=expenseBreakdown(txs);
   const sortedTxs=[...txs].sort((a,b)=>new Date(b.date)-new Date(a.date));
 
-  showModal(`
-    <div class="modal-title">💰 Finance</div>
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <div style="font-size:20px;font-weight:800">💰 Finance</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${_transactions.length} transactions total</div>
+      </div>
+    </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px">
       <div style="background:rgba(31,204,110,.08);border:1px solid rgba(31,204,110,.2);border-radius:9px;padding:9px;text-align:center">
@@ -5312,8 +5323,7 @@ function showFinance(){
         </div>`;
       }).join('')}
     </div>
-    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>
-  `);
+  `;
 }
 
 function showAddTransaction(type){
@@ -5336,7 +5346,7 @@ function showAddTransaction(type){
     <div class="lbl">Note (optional)</div>
     <input class="modal-inp" id="tx-note" placeholder="What was this for?"/>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="showFinance()">Cancel</button>
+      <button class="btn btn-ghost" onclick="renderFinance()">Cancel</button>
       <button class="btn ${type==='income'?'btn-green':'btn-accent'}" onclick="saveTransaction()">Save</button>
     </div>
   `);
@@ -5360,12 +5370,13 @@ function saveTransaction(){
   });
   saveTransactions();
   haptic('success');
+  closeModal();
   showToast(`${_txType==='income'?'💰':'💸'} ${formatMoney(amount)} saved!`);
-  showFinance();
+  renderFinance();
 }
 function deleteTransaction(id){
   _transactions=_transactions.filter(t=>t.id!==id);
-  saveTransactions();showFinance();
+  saveTransactions();renderFinance();
 }
 
 // ── TECHNIQUES MENU — picker for all 9 requested techniques ───────────
@@ -5419,7 +5430,7 @@ function showToolsMenu(){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
       ${tool('🍅','Pomodoro',"startPomodoro()",c.red)}
       ${tool('⏱️','2h Timer',"startTimer(120)",c.green)}
-      ${tool('💰','Finance',"showFinance()",c.green)}
+      ${tool('💰','Finance',"switchView('finance')",c.green)}
       ${tool('✅','Tasks',"showTaskList()",c.green)}
       ${tool('📝','Notes',"showNotesLib()",c.neutral)}
       ${tool('📊','Summary',"showWeeklySummary()",c.neutral)}
@@ -5883,7 +5894,7 @@ document.addEventListener('touchstart',e=>{_tx=e.touches[0].clientX;_ty=e.touche
 document.addEventListener('touchend',e=>{
   const dx=e.changedTouches[0].clientX-_tx,dy=e.changedTouches[0].clientY-_ty;
   if(Math.abs(dx)<Math.abs(dy)||Math.abs(dx)<60)return;
-  const views=['today','dashboard','habits','plans','books'];
+  const views=['today','dashboard','habits','plans','books','finance'];
   const cur=views.indexOf(currentView);
   if(dx<0&&cur<views.length-1)switchView(views[cur+1]);
   if(dx>0&&cur>0)switchView(views[cur-1]);
