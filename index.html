@@ -494,10 +494,82 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 // ═══════════════════════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════════════════════
-const WEBAPP_URL='https://script.google.com/macros/s/AKfycbzASV0nomt1ijFmWgpfAJuMYPijufwDnJYbrqTpMy6wY8mJOcIV1_faRRrGtTUrwq9f/exec';
-const ALLOWED_EMAIL='sathiya14ooty@gmail.com';
-const SECRET_TOKEN='GCPSathiya@Tracker26';
-const SESSION_KEY='lt_habit_v1';
+// ═══════════════════════════════════════════════════════════════════════
+// ENCRYPTED CREDENTIALS — AES-GCM 256-bit via Web Crypto API
+//
+// How it works:
+//   • WEBAPP_URL and ALLOWED_EMAIL are stored as AES-GCM ciphertext.
+//   • The decryption key is derived from the user's token at login time
+//     using PBKDF2 (100,000 iterations, SHA-256).
+//   • Nothing sensitive is ever in plain text in the source.
+//   • Wrong token → decryption throws OperationError → login fails cleanly.
+//   • Even if someone reads this source, ciphertext is useless without the token.
+//
+// To re-generate these blobs (e.g. if you change the URL or token):
+//   Run the encrypt-credentials.html tool and paste the new values here.
+// ═══════════════════════════════════════════════════════════════════════
+const ENC_URL   = '4rz0lmtIU7TQqK9hGGXOC6Wd3odRjAVTdOTdHtLMXchYCLPwoHHP84grixH25qQo0KV3MmdZE6WnipnsxjFbEvmpAQtFSappDQR8EC1NeqEAV6eNtHPD+CbQziQ4GFuB2srANggeL0Fyx8eGLOYfWVRaBMUM3Y0bVUBHOu/tu2uMUdLmyig83Dzvw08=';
+const ENC_EMAIL = 'Qpe56K+LnJpLjFO2CbYuppMXkF95tIAesbsfWLZf3NBeIaIIATuNCUsxCVfhNarPwt6I';
+const SESSION_KEY = 'lt_habit_v1';
+
+// These are populated at runtime after the user's token decrypts them
+let WEBAPP_URL    = null;
+let ALLOWED_EMAIL = null;
+let SECRET_TOKEN  = null; // kept only in sessionStorage after first decrypt
+
+// ── CRYPTO ENGINE ────────────────────────────────────────────────────────────
+
+async function deriveKey(passphrase, salt) {
+  const enc = new TextEncoder();
+  const raw = await crypto.subtle.importKey(
+    'raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: enc.encode(salt), iterations: 100000, hash: 'SHA-256' },
+    raw,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function aesDecrypt(b64, passphrase, salt) {
+  const key  = await deriveKey(passphrase, salt);
+  const data = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const iv   = data.slice(0, 12);
+  const ct   = data.slice(12);
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+  return new TextDecoder().decode(plain);
+}
+
+async function aesEncrypt(plaintext, passphrase, salt) {
+  const enc  = new TextEncoder();
+  const key  = await deriveKey(passphrase, salt);
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const ct   = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(plaintext));
+  const combined = new Uint8Array(12 + ct.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(ct), 12);
+  return btoa(String.fromCharCode(...combined));
+}
+
+// Decrypt all credentials using the user-supplied token.
+// Returns true on success, false if token is wrong.
+async function decryptCredentials(token) {
+  try {
+    // Derive the email from ENC_EMAIL first (salt is fixed per-account)
+    const email = await aesDecrypt(ENC_EMAIL, token, token + '_email_salt');
+    const url   = await aesDecrypt(ENC_URL,   token, email);
+    WEBAPP_URL    = url;
+    ALLOWED_EMAIL = email;
+    SECRET_TOKEN  = token;
+    return true;
+  } catch (e) {
+    // AES-GCM throws OperationError on wrong key — wrong token → login fails
+    WEBAPP_URL = ALLOWED_EMAIL = SECRET_TOKEN = null;
+    return false;
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════
@@ -1018,22 +1090,56 @@ function setSyncState(s){
 // LOGIN
 // ═══════════════════════════════════════════════════════════════════════
 async function doLogin(){
-  const email=document.getElementById('login-email').value.trim();
-  const token=document.getElementById('login-token').value.trim();
-  const err=document.getElementById('login-err');
-  const btn=document.getElementById('login-btn');
-  err.textContent='';
-  if(!email||!token){err.textContent='Please enter email and token.';return;}
-  if(email.toLowerCase()!==ALLOWED_EMAIL.toLowerCase()){err.textContent='Unauthorised email.';return;}
-  btn.disabled=true;
+  const emailInput = document.getElementById('login-email').value.trim();
+  const token      = document.getElementById('login-token').value.trim();
+  const err        = document.getElementById('login-err');
+  const btn        = document.getElementById('login-btn');
+  err.textContent  = '';
+  if(!emailInput||!token){err.textContent='Please enter email and token.';return;}
+
+  btn.disabled = true;
   document.getElementById('login-spinner').style.display='block';
-  sessionToken=token;
+  err.textContent = 'Verifying…';
+
+  // ── STEP 1: Decrypt credentials using the supplied token ──────────────
+  // If the token is wrong, AES-GCM decryption throws — we never reach the API.
+  const ok = await decryptCredentials(token);
+  if(!ok){
+    err.textContent = 'Invalid token — decryption failed.';
+    btn.disabled    = false;
+    document.getElementById('login-spinner').style.display='none';
+    return;
+  }
+
+  // ── STEP 2: Confirm the email input matches the decrypted email ────────
+  // This provides a second layer — user must know both email AND token.
+  if(emailInput.toLowerCase() !== ALLOWED_EMAIL.toLowerCase()){
+    err.textContent = 'Email does not match this account.';
+    WEBAPP_URL = ALLOWED_EMAIL = SECRET_TOKEN = null;
+    btn.disabled = false;
+    document.getElementById('login-spinner').style.display='none';
+    return;
+  }
+
+  // ── STEP 3: Hit the API with the now-decrypted URL ────────────────────
+  err.textContent = 'Connecting…';
+  sessionToken = token;
   try{
-    const res=await apiGet();
-    if(!res.success){err.textContent=res.error||'Invalid token.';sessionToken=null;}
-    else{loadSheet(res.data||[]);saveSession(token);showApp();}
-  }catch(e){err.textContent='Connection failed. Check your internet.';sessionToken=null;}
-  btn.disabled=false;
+    const res = await apiGet();
+    if(!res.success){
+      err.textContent = res.error||'Server rejected the request.';
+      sessionToken = null;
+    } else {
+      loadSheet(res.data||[]);
+      saveSession(token);
+      showApp();
+    }
+  }catch(e){
+    err.textContent = 'Connection failed. Check your internet.';
+    sessionToken = null;
+  }
+  err.textContent = '';
+  btn.disabled    = false;
   document.getElementById('login-spinner').style.display='none';
 }
 
@@ -2268,15 +2374,24 @@ function init(){
 window.onload=async()=>{
   const sess=getSession();
   if(sess?.token){
-    sessionToken=sess.token;
-    document.getElementById('loading').style.display='flex';
-    try{
-      const res=await apiGet();
-      if(res.success){loadSheet(res.data||[]);document.getElementById('loading').style.display='none';showApp();return;}
-    }catch(e){}
-    document.getElementById('loading').style.display='none';sessionToken=null;clearSession();
+    // Re-derive credentials from stored token — never store plaintext URL/email
+    const ok=await decryptCredentials(sess.token);
+    if(ok){
+      sessionToken=sess.token;
+      document.getElementById('loading').style.display='flex';
+      try{
+        const res=await apiGet();
+        if(res.success){
+          loadSheet(res.data||[]);
+          document.getElementById('loading').style.display='none';
+          showApp();return;
+        }
+      }catch(e){}
+      document.getElementById('loading').style.display='none';
+    }
+    sessionToken=null;clearSession();
   }
-  document.getElementById('login-email').value=ALLOWED_EMAIL;
+  // Login screen — don't pre-fill email (no plaintext credentials in DOM)
   document.getElementById('login-token').focus();
 };
 

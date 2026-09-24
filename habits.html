@@ -242,8 +242,35 @@ body.light{--bg:#f0f2f8;--surface:#fff;--surface2:#f5f7fc;--border:#dde2f0;--bor
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const WEBAPP_URL='https://script.google.com/macros/s/AKfycbzASV0nomt1ijFmWgpfAJuMYPijufwDnJYbrqTpMy6wY8mJOcIV1_faRRrGtTUrwq9f/exec';
-const ALLOWED_EMAIL='sathiya14ooty@gmail.com';
+// ── ENCRYPTED CREDENTIALS (AES-GCM 256-bit, decrypted at login) ────────
+const ENC_URL   = '4rz0lmtIU7TQqK9hGGXOC6Wd3odRjAVTdOTdHtLMXchYCLPwoHHP84grixH25qQo0KV3MmdZE6WnipnsxjFbEvmpAQtFSappDQR8EC1NeqEAV6eNtHPD+CbQziQ4GFuB2srANggeL0Fyx8eGLOYfWVRaBMUM3Y0bVUBHOu/tu2uMUdLmyig83Dzvw08=';
+const ENC_EMAIL = 'Qpe56K+LnJpLjFO2CbYuppMXkF95tIAesbsfWLZf3NBeIaIIATuNCUsxCVfhNarPwt6I';
+let WEBAPP_URL    = null;
+let ALLOWED_EMAIL = null;
+
+async function deriveKey(passphrase, salt) {
+  const enc = new TextEncoder();
+  const raw = await crypto.subtle.importKey('raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt:enc.encode(salt), iterations:100000, hash:'SHA-256' },
+    raw, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']
+  );
+}
+async function aesDecrypt(b64, passphrase, salt) {
+  const key  = await deriveKey(passphrase, salt);
+  const data = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const plain = await crypto.subtle.decrypt({ name:'AES-GCM', iv:data.slice(0,12) }, key, data.slice(12));
+  return new TextDecoder().decode(plain);
+}
+async function decryptCredentials(token) {
+  try {
+    const email = await aesDecrypt(ENC_EMAIL, token, token + '_email_salt');
+    const url   = await aesDecrypt(ENC_URL,   token, email);
+    WEBAPP_URL    = url;
+    ALLOWED_EMAIL = email;
+    return true;
+  } catch(e) { WEBAPP_URL = ALLOWED_EMAIL = null; return false; }
+}
 const SESSION_KEY='lt_habit_v1';
 
 // ── HABIT CONSTANTS ───────────────────────────────────────────────────
@@ -291,20 +318,35 @@ function setSyncState(s){
 
 // ── LOGIN ────────────────────────────────────────────────────────────
 async function doLogin(){
-  const email=document.getElementById('login-email').value.trim();
-  const token=document.getElementById('login-token').value.trim();
-  const err=document.getElementById('login-err');
-  err.textContent='';
-  if(!email||!token){err.textContent='Please enter email and token.';return;}
-  if(email.toLowerCase()!==ALLOWED_EMAIL.toLowerCase()){err.textContent='Unauthorised email.';return;}
-  const btn=document.getElementById('login-btn');btn.disabled=true;btn.textContent='Loading…';
+  const emailInput = document.getElementById('login-email').value.trim();
+  const token      = document.getElementById('login-token').value.trim();
+  const err        = document.getElementById('login-err');
+  const btn        = document.getElementById('login-btn');
+  err.textContent  = '';
+  if(!emailInput||!token){err.textContent='Please enter email and token.';return;}
+  btn.disabled=true; btn.textContent='Verifying…';
+
+  // Decrypt credentials — wrong token fails here before any network request
+  const ok = await decryptCredentials(token);
+  if(!ok){
+    err.textContent='Invalid token.';
+    btn.disabled=false; btn.textContent='Start Tracking →';
+    return;
+  }
+  if(emailInput.toLowerCase()!==ALLOWED_EMAIL.toLowerCase()){
+    err.textContent='Email does not match this account.';
+    WEBAPP_URL=ALLOWED_EMAIL=null;
+    btn.disabled=false; btn.textContent='Start Tracking →';
+    return;
+  }
+  btn.textContent='Connecting…';
   sessionToken=token;
   try{
     const res=await apiGet();
-    if(!res.success){err.textContent=res.error||'Invalid token.';sessionToken=null;}
+    if(!res.success){err.textContent=res.error||'Server error.';sessionToken=null;}
     else{loadSheet(res.data||[]);saveSession(token);showApp();}
   }catch{err.textContent='Connection failed.';sessionToken=null;}
-  btn.disabled=false;btn.textContent='Start Tracking →';
+  btn.disabled=false; btn.textContent='Start Tracking →';
 }
 
 function loadSheet(rows){
@@ -1000,28 +1042,31 @@ function showToast(msg){
 
 // ── INIT ─────────────────────────────────────────────────────────────
 window.onload=async()=>{
-  // Try localStorage first for fast load
+  // Load habits from localStorage immediately for instant render
   const localData=localStorage.getItem('lt_habits_v1');
   if(localData){try{_habits=JSON.parse(localData);}catch{}}
 
   const sess=getSession();
   if(sess?.token){
-    sessionToken=sess.token;
-    document.getElementById('loading').style.display='flex';
-    try{
-      const res=await apiGet();
-      if(res.success){
-        loadSheet(res.data||[]);
-        document.getElementById('loading').style.display='none';
-        showApp();return;
-      }
-    }catch(e){}
-    document.getElementById('loading').style.display='none';
-    // If API fails but we have local data, show app anyway
-    if(_habits.length>0){showApp();return;}
+    // Re-decrypt credentials from stored token — no plaintext secrets anywhere
+    const ok=await decryptCredentials(sess.token);
+    if(ok){
+      sessionToken=sess.token;
+      document.getElementById('loading').style.display='flex';
+      try{
+        const res=await apiGet();
+        if(res.success){
+          loadSheet(res.data||[]);
+          document.getElementById('loading').style.display='none';
+          showApp();return;
+        }
+      }catch(e){}
+      document.getElementById('loading').style.display='none';
+      // API failed but we have local habit data — show app in offline mode
+      if(_habits.length>0){showApp();return;}
+    }
     sessionToken=null;clearSession();
   }
-  document.getElementById('login-email').value=ALLOWED_EMAIL;
   document.getElementById('login-token').focus();
 };
 
