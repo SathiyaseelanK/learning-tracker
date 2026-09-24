@@ -1167,9 +1167,29 @@ async function touchSession(){
 // Bump DATA_VERSION whenever a localStorage data shape changes.
 // migrations[n] runs once, upgrading FROM version n TO n+1.
 // ═══════════════════════════════════════════════════════════════════════
-const DATA_VERSION=2;
+const DATA_VERSION=3;
 const migrations={
   1:()=>{ // v1 -> v2: nothing structural yet, just stamp the version
+  },
+  2:()=>{
+    // v2 -> v3: SECURITY FIX — earlier versions of this app persisted the
+    // decrypted server token in plaintext inside the offline sync queue
+    // (localStorage['lt_pending_queue']). Scrub it now for anyone who used
+    // an earlier build, regardless of whether they have pending writes.
+    try{
+      const raw = localStorage.getItem('lt_pending_queue');
+      if(raw){
+        const queue = JSON.parse(raw);
+        const cleaned = Array.isArray(queue) ? queue.map(item=>{
+          const {token, ...rest} = item||{};
+          return rest;
+        }) : [];
+        localStorage.setItem('lt_pending_queue', JSON.stringify(cleaned));
+      }
+    }catch(e){
+      // Corrupted queue data — safest thing is to clear it entirely
+      localStorage.removeItem('lt_pending_queue');
+    }
   },
 };
 function runMigrations(){
@@ -1193,17 +1213,40 @@ let _syncQueue=[];
 let _syncBusy=false;
 let _isOnline=navigator.onLine;
 
+// ── SECURITY NOTE ─────────────────────────────────────────────────────────
+// The queue is persisted to plain localStorage so it survives a refresh —
+// but it must NEVER contain the server token. The token is stripped before
+// every write to storage and re-attached fresh from memory only at the
+// instant a request is actually sent. This means:
+//   • localStorage['lt_pending_queue'] only ever holds moduleId/status/
+//     note/action/clientUpdatedAt — inspecting it in DevTools reveals
+//     nothing that could authenticate against Apps Script.
+//   • If the token isn't in memory yet (e.g. app was force-closed before
+//     login completed), queued items simply wait — they cannot leak or
+//     partially send without it.
+function stripToken(req){
+  const {token, ...rest} = req; // eslint-disable-line no-unused-vars
+  return rest;
+}
+
 function loadPendingQueue(){
   try{_syncQueue=JSON.parse(localStorage.getItem('lt_pending_queue')||'[]');}catch{_syncQueue=[];}
 }
-function persistQueue(){localStorage.setItem('lt_pending_queue',JSON.stringify(_syncQueue));}
+function persistQueue(){
+  // Defense in depth: strip any token field even if one somehow ended up
+  // in the in-memory queue, so it can never reach localStorage.
+  const safeQueue = _syncQueue.map(stripToken);
+  localStorage.setItem('lt_pending_queue', JSON.stringify(safeQueue));
+}
 loadPendingQueue();
 
 function enqueueWrite(req){
-  // Collapse: if a write for the same moduleId is already queued and not yet sent, replace it
-  // (only the latest status/note for a key matters — no need to send stale intermediate states)
-  const dupIdx=_syncQueue.findIndex(q=>q.moduleId===req.moduleId&&q.action===req.action);
-  if(dupIdx>=0) _syncQueue[dupIdx]=req; else _syncQueue.push(req);
+  // Never let a token field enter the in-memory queue either — it's added
+  // back on-the-fly at send time in processQueue(), using whatever the
+  // current session's token is (handles token rotation mid-session cleanly).
+  const safeReq = stripToken(req);
+  const dupIdx=_syncQueue.findIndex(q=>q.moduleId===safeReq.moduleId&&q.action===safeReq.action);
+  if(dupIdx>=0) _syncQueue[dupIdx]=safeReq; else _syncQueue.push(safeReq);
   persistQueue();
   processQueue();
 }
@@ -1211,12 +1254,15 @@ function enqueueWrite(req){
 async function processQueue(){
   if(_syncBusy||!_syncQueue.length) return;
   if(!_isOnline){ setSyncState('error'); return; }
+  if(!SECRET_TOKEN){ setSyncState('error'); return; } // not logged in yet — wait
   _syncBusy=true;
   setSyncState('syncing');
   while(_syncQueue.length){
-    const req=_syncQueue[0];
+    const queued=_syncQueue[0];
+    // Attach the live token only for this one outgoing request — never stored
+    const outgoing={...queued, token:SECRET_TOKEN};
     try{
-      const r=await fetchWithRetry(WEBAPP_URL,{method:'POST',body:JSON.stringify(req)},2);
+      const r=await fetchWithRetry(WEBAPP_URL,{method:'POST',body:JSON.stringify(outgoing)},2);
       const json=await r.json();
       if(!json.success) throw new Error(json.error||'save failed');
       _syncQueue.shift();
