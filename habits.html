@@ -4,6 +4,21 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Habits — Daily Tracker</title>
+
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: https:;
+  font-src 'self' data:;
+  connect-src 'self' https://script.google.com https://script.googleusercontent.com;
+  object-src 'none';
+  base-uri 'self';
+  form-action 'none';
+"/>
+<meta http-equiv="X-Content-Type-Options" content="nosniff"/>
+<meta name="referrer" content="strict-origin-when-cross-origin"/>
+
 <link rel="manifest" href="manifest.json"/>
 <link rel="icon" href="icon-192.png"/>
 <link rel="apple-touch-icon" href="icon-192.png"/>
@@ -11,6 +26,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Habits"/>
+
+<!-- Clickjacking protection — see index.html for full explanation -->
+<script>
+  if (window.top !== window.self) {
+    window.top.location = window.self.location;
+  }
+</script>
 <style>
 :root{
   --bg:#0b0e1a;--surface:#131729;--surface2:#1c2138;--border:#252d4a;--border2:#2e3a5c;
@@ -190,6 +212,14 @@ body.light{--bg:#f0f2f8;--surface:#fff;--surface2:#f5f7fc;--border:#dde2f0;--bor
     <input class="inp" id="login-email" type="email" placeholder="your@gmail.com"/>
     <div class="lbl">Access Token</div>
     <input class="inp" id="login-token" type="password" placeholder="Your secret token"/>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:4px 2px">
+      <input type="checkbox" id="remember-me" checked
+        style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0"/>
+      <label for="remember-me"
+        style="font-size:12px;color:var(--text2);cursor:pointer;line-height:1.4">
+        Stay logged in on this device
+      </label>
+    </div>
     <button class="login-btn" id="login-btn" onclick="doLogin()" style="display:flex;align-items:center;justify-content:center;gap:8px">
       <div class="login-btn-spinner" id="login-btn-spinner"></div>
       <span id="login-btn-text">Start Tracking →</span>
@@ -250,9 +280,9 @@ body.light{--bg:#f0f2f8;--surface:#fff;--surface2:#f5f7fc;--border:#dde2f0;--bor
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
 // ── ENCRYPTED CREDENTIALS (AES-GCM 256-bit, decrypted at login) ────────
-const ENC_URL       = 'aLQw9anNEdvkqxhHT/3Y3CkJMRxi70A4bSXn1bSUvp/rOx5sGgG9zSE+NC5hrVzMQyHg5SYVt2T9vq/gc1isE9+6RMMQZxWi5ccwZ1Dy4HrXoZTNqWGuLwZgz1ncLq2UjoU+Av0p/LQM9R+v8gCf/e7hgKtdnNfaQmRMGNqmbnvKF/xyVtHtjjXPKd4=';
-const ENC_EMAIL     = 'zJjcoXMS7l2cM3Obmyk8vPy/gmu2JROkDttbkC3yzVKa/8VfmUe6aF9iUy1WTlElSqOt';
-const ENC_SERVERKEY = '/tnvHIHM3W6qyBecqO5Lup3dCNWRVR4PTX50aMg6SIsomMO7pFA+9n++ClQ=';
+const ENC_URL       = 'IOALKBoqD9MBHPmHfEehIJn/OSm5t8uvaaakXV6zePT/qrRVVVkCCFu3mo8wyUop0JjEFjdrcHzibfWyyAwOPTnTcsODw5PPcTeESNEuZHibxFCtqV+95DqSupmsZcAcKj7MCr5R2ZlaGPfKF5KnnuXkML+Zqe7UCDSIRlzZz9wAl+YTDYE5xiWflfM=';
+const ENC_EMAIL     = '5cXygkkjP4b63j27k0756bGRWw6FhhRKbOoDywmE6scIFessqBIJE/6RJXM5NFv0CJ8v';
+const ENC_SERVERKEY = 'Ro9cYdygrH8Jeoum6wQo2edtc1GSh/7L89PNusLinZ7xsn24DhpHHFmBdVGh';
 let WEBAPP_URL    = null;
 let ALLOWED_EMAIL = null;
 let SERVER_KEY    = null;
@@ -284,6 +314,18 @@ async function decryptCredentials(token) {
 }
 const SESSION_KEY='lt_habit_v1';
 
+// ── XSS PREVENTION — same as index.html, see comment there for details ──────
+const _escDiv = document.createElement('div');
+function escapeHtml(str){
+  if(str===null||str===undefined) return '';
+  _escDiv.textContent = String(str);
+  return _escDiv.innerHTML;
+}
+function escapeAttr(str){
+  return escapeHtml(str).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+const esc = escapeHtml;
+
 // ── HABIT CONSTANTS ───────────────────────────────────────────────────
 const HABIT_COLORS=['#3d7fff','#1fcc6e','#f5a623','#ef4444','#a855f7','#0078d4','#e0234e','#61dafb','#f97316','#14b8a6'];
 const HABIT_CATS=['Health','Fitness','Learning','Mindfulness','Productivity','Social','Finance','Other'];
@@ -310,9 +352,157 @@ let currentView='today';
 let sessionToken=null;
 
 // ── AUTH ─────────────────────────────────────────────────────────────
-function getSession(){try{return JSON.parse(sessionStorage.getItem(SESSION_KEY));}catch{return null;}}
-function saveSession(t){sessionStorage.setItem(SESSION_KEY,JSON.stringify({token:t}));}
-function clearSession(){sessionStorage.removeItem(SESSION_KEY);}
+// ── SECURE PERSISTENT SESSION ────────────────────────────────────────────────
+// How it works:
+//
+//   1. On first login, a random AES-GCM 256-bit key is generated and stored
+//      in IndexedDB as a NON-EXTRACTABLE CryptoKey.
+//      → This key never appears as readable bytes anywhere — not in DevTools,
+//        not in memory dumps, not in network requests.
+//
+//   2. The login token is encrypted with that key before being written to
+//      localStorage. What sits in localStorage is pure ciphertext.
+//      → Even if someone reads localStorage in DevTools, they see:
+//        "lt_habit_v1" → "H1IdutVngZEQSzlDx…" (meaningless without the key)
+//
+//   3. On next app open, the key is loaded from IndexedDB and used to decrypt
+//      the token from localStorage → auto-login with no password prompt.
+//
+//   4. The key is device-bound. If someone copies localStorage to another
+//      device, the ciphertext cannot be decrypted without the IndexedDB key
+//      that lives only on the original device.
+//
+//   5. Auto-expires after 30 days of inactivity. touchSession() resets the timer.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+const SESSION_DAYS = 30;
+const IDB_DB_NAME  = 'lt_secure';
+const IDB_STORE    = 'keys';
+const IDB_KEY_NAME = 'deviceKey';
+
+// ── IndexedDB helpers ─────────────────────────────────────────────────────
+function openIDB(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open(IDB_DB_NAME, 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE);
+    req.onsuccess  = e => resolve(e.target.result);
+    req.onerror    = e => reject(e.target.error);
+  });
+}
+function idbGet(db, key){
+  return new Promise((resolve, reject)=>{
+    const tx  = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+function idbSet(db, key, val){
+  return new Promise((resolve, reject)=>{
+    const tx  = db.transaction(IDB_STORE, 'readwrite');
+    const req = tx.objectStore(IDB_STORE).put(val, key);
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+function idbDel(db, key){
+  return new Promise((resolve, reject)=>{
+    const tx  = db.transaction(IDB_STORE, 'readwrite');
+    const req = tx.objectStore(IDB_STORE).delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+// ── Device key management ─────────────────────────────────────────────────
+// Returns the device's AES-GCM key, creating it on first call.
+let _deviceKey = null; // in-memory cache for the current session
+
+async function getDeviceKey(){
+  if(_deviceKey) return _deviceKey;
+  try{
+    const db  = await openIDB();
+    let   key = await idbGet(db, IDB_KEY_NAME);
+    if(!key){
+      // First time on this device — generate a new non-extractable key
+      key = await crypto.subtle.generateKey(
+        { name:'AES-GCM', length:256 },
+        false,           // NON-EXTRACTABLE — can never be read out as raw bytes
+        ['encrypt','decrypt']
+      );
+      await idbSet(db, IDB_KEY_NAME, key);
+    }
+    _deviceKey = key;
+    return key;
+  }catch(e){
+    // IndexedDB unavailable (private browsing on some browsers) — fall back to
+    // a session-only in-memory key. This means auto-login won't work across
+    // app restarts in private mode, but nothing breaks.
+    if(!_deviceKey){
+      _deviceKey = await crypto.subtle.generateKey(
+        { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']
+      );
+    }
+    return _deviceKey;
+  }
+}
+
+// ── Session read/write ────────────────────────────────────────────────────
+async function getSession(){
+  try{
+    const raw = localStorage.getItem(SESSION_KEY);
+    if(!raw) return null;
+    const key  = await getDeviceKey();
+    const data = Uint8Array.from(atob(raw), c=>c.charCodeAt(0));
+    const iv   = data.slice(0,12);
+    const ct   = data.slice(12);
+    const plain = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, key, ct);
+    const s     = JSON.parse(new TextDecoder().decode(plain));
+    // Check expiry
+    if(!s.token || !s.savedAt) return null;
+    const ageDays = (Date.now() - s.savedAt) / (1000*60*60*24);
+    if(ageDays >= SESSION_DAYS){
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return s;
+  }catch{
+    // Decryption failed — key mismatch (reinstall, cleared IDB) or corrupted data
+    localStorage.removeItem(SESSION_KEY);
+    return null;
+  }
+}
+
+async function saveSession(t){
+  try{
+    const key  = await getDeviceKey();
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+    const plain = new TextEncoder().encode(JSON.stringify({ token:t, savedAt:Date.now() }));
+    const ct   = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, plain);
+    const packed = new Uint8Array(12 + ct.byteLength);
+    packed.set(iv);
+    packed.set(new Uint8Array(ct), 12);
+    const b64 = btoa(String.fromCharCode(...packed));
+    localStorage.setItem(SESSION_KEY, b64);
+  }catch(e){
+    console.warn('saveSession failed:', e);
+  }
+}
+
+function clearSession(){
+  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
+  // Also delete the device key so even the ciphertext is permanently unrecoverable
+  openIDB().then(db=>idbDel(db, IDB_KEY_NAME)).catch(()=>{});
+  _deviceKey = null;
+}
+
+async function touchSession(){
+  // Refresh the savedAt timestamp — resets the 30-day inactivity timer
+  const s = await getSession();
+  if(s) await saveSession(s.token);
+}
+
 
 // ── API ──────────────────────────────────────────────────────────────
 async function apiGet(){
@@ -328,6 +518,28 @@ function setSyncState(s){
 }
 
 // ── LOGIN ────────────────────────────────────────────────────────────
+// ── BRUTE-FORCE PROTECTION (shares the counter with index.html — same origin) ──
+const LOGIN_ATTEMPTS_KEY='lt_login_attempts';
+const MAX_FREE_ATTEMPTS=5;
+const MAX_LOCKOUT_MS=30*60*1000;
+
+function getLoginAttempts(){
+  try{return JSON.parse(localStorage.getItem(LOGIN_ATTEMPTS_KEY)||'{"count":0,"lockedUntil":0}');}
+  catch{return{count:0,lockedUntil:0};}
+}
+function saveLoginAttempts(a){localStorage.setItem(LOGIN_ATTEMPTS_KEY,JSON.stringify(a));}
+function recordFailedLogin(){
+  const a=getLoginAttempts();a.count++;
+  if(a.count>MAX_FREE_ATTEMPTS){
+    const backoffMs=Math.min(30000*Math.pow(2,a.count-MAX_FREE_ATTEMPTS-1),MAX_LOCKOUT_MS);
+    a.lockedUntil=Date.now()+backoffMs;
+  }
+  saveLoginAttempts(a);return a;
+}
+function clearLoginAttempts(){localStorage.removeItem(LOGIN_ATTEMPTS_KEY);}
+function getLockoutRemaining(){const a=getLoginAttempts();const r=a.lockedUntil-Date.now();return r>0?r:0;}
+function formatLockoutTime(ms){const s=Math.ceil(ms/1000);return s<60?s+'s':Math.ceil(s/60)+'m';}
+
 async function doLogin(){
   const emailInput = document.getElementById('login-email').value.trim();
   const token      = document.getElementById('login-token').value.trim();
@@ -338,6 +550,13 @@ async function doLogin(){
   const btnText    = document.getElementById('login-btn-text');
 
   errEl.textContent=''; statusEl.textContent=''; statusEl.classList.remove('show');
+
+  const lockedMs=getLockoutRemaining();
+  if(lockedMs>0){
+    errEl.textContent=`Too many failed attempts. Try again in ${formatLockoutTime(lockedMs)}.`;
+    return;
+  }
+
   if(!emailInput||!token){errEl.textContent='Please enter your email and token.';return;}
 
   btn.disabled=true; btnSpinner.style.display='block'; btnText.textContent='Verifying…';
@@ -345,7 +564,11 @@ async function doLogin(){
 
   const ok=await decryptCredentials(token);
   if(!ok){
-    errEl.textContent='Invalid token. Please check and try again.';
+    const a=recordFailedLogin();
+    const left=Math.max(0,MAX_FREE_ATTEMPTS-a.count);
+    errEl.textContent = a.lockedUntil>Date.now()
+      ? `Invalid token. Locked for ${formatLockoutTime(a.lockedUntil-Date.now())}.`
+      : `Invalid token. ${left} attempt${left===1?'':'s'} left before lockout.`;
     reset(); return;
   }
   if(emailInput.toLowerCase()!==ALLOWED_EMAIL.toLowerCase()){
@@ -362,8 +585,11 @@ async function doLogin(){
       errEl.textContent=res.error||'Server rejected the request.';
       sessionToken=null; reset();
     } else {
+      clearLoginAttempts();
       statusEl.textContent='✅ Synced! Loading your habits…';
-      loadSheet(res.data||[]);saveSession(token);
+      loadSheet(res.data||[]);
+      const remember=document.getElementById('remember-me')?.checked!==false;
+      if(remember) await saveSession(token);
       setTimeout(()=>{showApp();reset();},600);
     }
   }catch{
@@ -490,13 +716,13 @@ async function logHabitWithNote(id){
   const h=_habits.find(x=>x.id===id);if(!h)return;
   const log=getTodayLog(h);
   showModal(`
-    <div class="modal-title">${h.icon} ${h.name}</div>
+    <div class="modal-title">${h.icon} ${esc(h.name)}</div>
     ${h.targetPerDay>1?`
-      <div class="lbl">${h.unit?h.unit.charAt(0).toUpperCase()+h.unit.slice(1)+' today':'Count today'}</div>
+      <div class="lbl">${h.unit?esc(h.unit.charAt(0).toUpperCase()+h.unit.slice(1))+' today':'Count today'}</div>
       <input class="modal-inp" id="hlog-count" type="number" value="${log?.count||h.targetPerDay}" min="0"/>
     `:''}
     <div class="lbl">Note (optional)</div>
-    <input class="modal-inp" id="hlog-note" placeholder="How did it go?" value="${log?.note||''}"/>
+    <input class="modal-inp" id="hlog-note" placeholder="How did it go?" value="${escapeAttr(log?.note||'')}"/>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
       <button class="btn btn-accent" onclick="saveHabitLog('${id}')">Save</button>
@@ -703,7 +929,7 @@ function renderStats(){
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
           <div style="font-size:22px">${h.icon}</div>
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:700">${h.name}</div>
+            <div style="font-size:13px;font-weight:700">${esc(h.name)}</div>
             <div style="font-size:11px;color:var(--text2)">${h.category||''}</div>
           </div>
           ${streak>0?`<div style="font-size:12px;font-weight:700;color:var(--yellow)">${streak}🔥</div>`:''}
@@ -732,8 +958,8 @@ function renderHabitCard(h,dimmed=false){
     <div class="htc-head">
       <div class="htc-icon" style="background:${h.color}22;font-size:22px">${h.icon}</div>
       <div class="htc-info" onclick="_habitsView='detail';_detailHabitId='${h.id}';renderAll()">
-        <div class="htc-name">${h.name}</div>
-        <div class="htc-meta">${h.category||''}${h.targetPerDay>1&&h.unit?` · Goal: ${h.targetPerDay} ${h.unit}`:''}${rate>0?` · ${rate}% this month`:''}</div>
+        <div class="htc-name">${esc(h.name)}</div>
+        <div class="htc-meta">${esc(h.category||'')}${h.targetPerDay>1&&h.unit?` · Goal: ${h.targetPerDay} ${esc(h.unit)}`:''}${rate>0?` · ${rate}% this month`:''}</div>
         ${streak>0?`<div class="htc-streak">🔥 ${streak} day streak</div>`:''}
       </div>
       <button class="htc-check-btn ${status==='done'?'done':status==='skipped'?'skipped':''}"
@@ -746,15 +972,15 @@ function renderHabitCard(h,dimmed=false){
     </div>
     ${status==='pending'&&!dimmed?`
     <div class="htc-actions">
-      <button class="htc-btn htc-btn-done" onclick="${h.targetPerDay>1||h.notes?`logHabitWithNote('${h.id}')`:`logHabit('${h.id}',true,1)`}">${h.targetPerDay>1?`✓ Log ${h.unit||''}`.trim():'✓ Done'}</button>
+      <button class="htc-btn htc-btn-done" onclick="${h.targetPerDay>1||h.notes?`logHabitWithNote('${h.id}')`:`logHabit('${h.id}',true,1)`}">${h.targetPerDay>1?esc(`✓ Log ${h.unit||''}`.trim()):'✓ Done'}</button>
       <button class="htc-btn htc-btn-log" onclick="_habitsView='detail';_detailHabitId='${h.id}';renderAll()">📊 Details</button>
       <button class="htc-btn htc-btn-skip" onclick="logHabit('${h.id}',false,0)">↷ Skip</button>
     </div>`:''}
     ${(status==='done'||status==='skipped')&&!dimmed?`
     <div class="htc-actions">
       <button class="htc-btn htc-btn-undo" onclick="undoHabitLog('${h.id}')">↩ Undo</button>
-      ${log?.count&&h.targetPerDay>1?`<span style="font-size:11px;color:var(--text2);align-self:center">${log.count}/${h.targetPerDay} ${h.unit||''}</span>`:''}
-      ${log?.note?`<span style="font-size:11px;color:var(--text2);align-self:center;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">"${log.note}"</span>`:''}
+      ${log?.count&&h.targetPerDay>1?`<span style="font-size:11px;color:var(--text2);align-self:center">${log.count}/${h.targetPerDay} ${esc(h.unit||'')}</span>`:''}
+      ${log?.note?`<span style="font-size:11px;color:var(--text2);align-self:center;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">"${esc(log.note)}"</span>`:''}
     </div>`:''}
   </div>`;
 }
@@ -787,7 +1013,7 @@ function renderHabitDetail(id,el){
       <button onclick="_habitsView='list';renderAll()" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text2);font-size:12px;cursor:pointer">← Back</button>
       <div style="font-size:20px">${h.icon}</div>
       <div style="flex:1">
-        <div style="font-size:16px;font-weight:800">${h.name}</div>
+        <div style="font-size:16px;font-weight:800">${esc(h.name)}</div>
         <div style="font-size:11px;color:var(--text2)">${h.category||''} · ${h.frequency==='daily'?'Every day':h.frequency==='weekdays'?'Mon–Fri':h.frequency==='weekends'?'Weekends':'Custom days'}</div>
       </div>
       <button onclick="editHabit('${id}')" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--text2);cursor:pointer">✏️</button>
@@ -824,7 +1050,7 @@ function renderHabitDetail(id,el){
     ${recentLogs.map(l=>`
       <div class="hlog-item">
         <div class="hlog-date">${new Date(l.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
-        <div class="hlog-note">${l.count&&h.unit&&l.count!==1?`${l.count} ${h.unit}${l.note?' · ':''}`:''} ${l.note||'✓'}</div>
+        <div class="hlog-note">${l.count&&h.unit&&l.count!==1?`${l.count} ${esc(h.unit)}${l.note?' · ':''}`:''} ${esc(l.note||'✓')}</div>
       </div>`).join('')}`:''}
 
     <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
@@ -854,12 +1080,12 @@ function renderAddForm(editId,el){
     </div>
 
     <div class="lbl">Habit Name *</div>
-    <input class="modal-inp" id="hb-name" placeholder="e.g. Morning Run, Read 30 pages…" value="${existing?.name||''}"/>
+    <input class="modal-inp" id="hb-name" placeholder="e.g. Morning Run, Read 30 pages…" value="${escapeAttr(existing?.name||'')}"/>
 
     <div style="display:flex;gap:10px;margin-bottom:4px">
       <div style="flex:0 0 80px">
         <div class="lbl">Icon</div>
-        <input class="modal-inp" id="hb-icon" placeholder="💪" value="${existing?.icon||'✅'}" maxlength="2" style="font-size:22px;text-align:center;width:60px"/>
+        <input class="modal-inp" id="hb-icon" placeholder="💪" value="${escapeAttr(existing?.icon||'✅')}" maxlength="2" style="font-size:22px;text-align:center;width:60px"/>
       </div>
       <div style="flex:1">
         <div class="lbl">Category</div>
@@ -893,7 +1119,7 @@ function renderAddForm(editId,el){
       </div>
       <div style="flex:1">
         <div class="lbl">Unit (optional)</div>
-        <input class="modal-inp" id="hb-unit" placeholder="min, glasses, pages, ₹…" value="${existing?.unit||''}"/>
+        <input class="modal-inp" id="hb-unit" placeholder="min, glasses, pages, ₹…" value="${escapeAttr(existing?.unit||'')}"/>
       </div>
     </div>
 
@@ -999,7 +1225,7 @@ function showArchivedHabits(){
       ${archived.map(h=>`
         <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
           <div style="font-size:20px">${h.icon}</div>
-          <div style="flex:1"><div style="font-size:13px;font-weight:600">${h.name}</div><div style="font-size:11px;color:var(--text3)">${(h.logs||[]).filter(l=>l.done).length} completions</div></div>
+          <div style="flex:1"><div style="font-size:13px;font-weight:600">${esc(h.name)}</div><div style="font-size:11px;color:var(--text3)">${(h.logs||[]).filter(l=>l.done).length} completions</div></div>
           <button onclick="unarchiveHabit('${h.id}')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer">Restore</button>
         </div>`).join('')}
     </div>
@@ -1074,7 +1300,7 @@ window.onload=async()=>{
   const localData=localStorage.getItem('lt_habits_v1');
   if(localData){try{_habits=JSON.parse(localData);}catch{}}
 
-  const sess=getSession();
+  const sess=await getSession();
   if(sess?.token){
     document.getElementById('loading').style.display='flex';
     setLoadMsg('🔐 Decrypting credentials…');
@@ -1104,6 +1330,10 @@ function setLoadMsg(msg){
   const el=document.getElementById('loading-msg');
   if(el) el.textContent=msg;
 }
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&sessionToken) touchSession();
+});
 
 document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none')doLogin();

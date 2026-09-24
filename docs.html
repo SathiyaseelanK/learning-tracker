@@ -4,6 +4,27 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Learning Habit Tracker — Docs</title>
+
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: https:;
+  font-src 'self' data:;
+  connect-src 'self';
+  object-src 'none';
+  base-uri 'self';
+  form-action 'none';
+"/>
+<meta http-equiv="X-Content-Type-Options" content="nosniff"/>
+<meta name="referrer" content="strict-origin-when-cross-origin"/>
+
+<!-- Clickjacking protection -->
+<script>
+  if (window.top !== window.self) {
+    window.top.location = window.self.location;
+  }
+</script>
 <style>
 :root{
   --bg:#0b0e1a;--surface:#131729;--surface2:#1c2138;--border:#252d4a;--border2:#2e3a5c;
@@ -216,7 +237,7 @@ kbd{background:var(--surface2);border:1px solid var(--border2);border-radius:5px
     <tr><th>Field</th><th>Value</th></tr>
     <tr><td>Email</td><td><code>sathiya14ooty@gmail.com</code></td></tr>
     <tr><td>Token</td><td><code>GCPSathiya@Tracker26</code></td></tr>
-    <tr><td>Google Sheet</td><td><a href="https://docs.google.com/spreadsheets/d/1lA6tH0HK8G185UP2Dn4MmQaJCOLXVI4rF4qPOPTfRQE" target="_blank">Open Sheet →</a></td></tr>
+    <tr><td>Google Sheet</td><td><a href="https://docs.google.com/spreadsheets/d/1lA6tH0HK8G185UP2Dn4MmQaJCOLXVI4rF4qPOPTfRQE" target="_blank" rel="noopener noreferrer">Open Sheet →</a></td></tr>
     <tr><td>Apps Script URL</td><td>Deployed Web App (secured by token)</td></tr>
   </table>
 
@@ -642,7 +663,7 @@ kbd{background:var(--surface2);border:1px solid var(--border2);border-radius:5px
   <div class="callout callout-warn">If sync fails on a session mark, the tracker shows a red dot. Your action is recorded locally — try refreshing and marking again. Data is never silently lost.</div>
 
   <h2>Viewing your data</h2>
-  <p><a href="https://docs.google.com/spreadsheets/d/1lA6tH0HK8G185UP2Dn4MmQaJCOLXVI4rF4qPOPTfRQE" target="_blank">Open your Google Sheet →</a></p>
+  <p><a href="https://docs.google.com/spreadsheets/d/1lA6tH0HK8G185UP2Dn4MmQaJCOLXVI4rF4qPOPTfRQE" target="_blank" rel="noopener noreferrer">Open your Google Sheet →</a></p>
   <p>The sheet has columns: <code>moduleId</code>, <code>status</code>, <code>note</code>, <code>updatedAt</code>, <code>email</code>.</p>
 </div>
 
