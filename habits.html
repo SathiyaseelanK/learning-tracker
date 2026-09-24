@@ -32,7 +32,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .login-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px}
 .login-btn:hover{opacity:.88}
 .login-btn:disabled{opacity:.5;cursor:not-allowed}
-.login-err{font-size:12px;color:var(--red);margin-top:8px;min-height:16px;text-align:center}
+.login-err{font-size:12px;color:var(--red);margin-top:6px;min-height:16px;text-align:center}
+.login-status{font-size:12px;color:var(--green);margin-top:6px;min-height:16px;text-align:center;display:none;align-items:center;justify-content:center;gap:6px}
+.login-status.show{display:flex}
+.login-btn-spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none;margin-right:4px}
 
 /* LOADING */
 #loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50;flex-direction:column;gap:12px}
@@ -187,7 +190,11 @@ body.light{--bg:#f0f2f8;--surface:#fff;--surface2:#f5f7fc;--border:#dde2f0;--bor
     <input class="inp" id="login-email" type="email" placeholder="your@gmail.com"/>
     <div class="lbl">Access Token</div>
     <input class="inp" id="login-token" type="password" placeholder="Your secret token"/>
-    <button class="login-btn" id="login-btn" onclick="doLogin()">Start Tracking →</button>
+    <button class="login-btn" id="login-btn" onclick="doLogin()" style="display:flex;align-items:center;justify-content:center;gap:8px">
+      <div class="login-btn-spinner" id="login-btn-spinner"></div>
+      <span id="login-btn-text">Start Tracking →</span>
+    </button>
+    <div class="login-status" id="login-status"></div>
     <div class="login-err" id="login-err"></div>
   </div>
 </div>
@@ -195,7 +202,7 @@ body.light{--bg:#f0f2f8;--surface:#fff;--surface2:#f5f7fc;--border:#dde2f0;--bor
 <!-- LOADING -->
 <div id="loading" style="display:none">
   <div class="spin"></div>
-  <div style="font-size:13px;color:var(--text2)">Loading your habits…</div>
+  <div id="loading-msg" style="font-size:13px;color:var(--text2);margin-top:4px">Loading…</div>
 </div>
 
 <!-- APP -->
@@ -324,33 +331,50 @@ function setSyncState(s){
 async function doLogin(){
   const emailInput = document.getElementById('login-email').value.trim();
   const token      = document.getElementById('login-token').value.trim();
-  const err        = document.getElementById('login-err');
+  const errEl      = document.getElementById('login-err');
+  const statusEl   = document.getElementById('login-status');
   const btn        = document.getElementById('login-btn');
-  err.textContent  = '';
-  if(!emailInput||!token){err.textContent='Please enter email and token.';return;}
-  btn.disabled=true; btn.textContent='Verifying…';
+  const btnSpinner = document.getElementById('login-btn-spinner');
+  const btnText    = document.getElementById('login-btn-text');
 
-  // Decrypt credentials — wrong token fails here before any network request
-  const ok = await decryptCredentials(token);
+  errEl.textContent=''; statusEl.textContent=''; statusEl.classList.remove('show');
+  if(!emailInput||!token){errEl.textContent='Please enter your email and token.';return;}
+
+  btn.disabled=true; btnSpinner.style.display='block'; btnText.textContent='Verifying…';
+  statusEl.textContent='🔐 Verifying token…'; statusEl.classList.add('show');
+
+  const ok=await decryptCredentials(token);
   if(!ok){
-    err.textContent='Invalid token.';
-    btn.disabled=false; btn.textContent='Start Tracking →';
-    return;
+    errEl.textContent='Invalid token. Please check and try again.';
+    reset(); return;
   }
   if(emailInput.toLowerCase()!==ALLOWED_EMAIL.toLowerCase()){
-    err.textContent='Email does not match this account.';
-    WEBAPP_URL=ALLOWED_EMAIL=null;
-    btn.disabled=false; btn.textContent='Start Tracking →';
-    return;
+    errEl.textContent='Email does not match this account.';
+    WEBAPP_URL=ALLOWED_EMAIL=SERVER_KEY=null; reset(); return;
   }
-  btn.textContent='Connecting…';
+
+  btnText.textContent='Connecting…';
+  statusEl.textContent='🌐 Connecting to Google Sheets…';
   sessionToken=token;
   try{
     const res=await apiGet();
-    if(!res.success){err.textContent=res.error||'Server error.';sessionToken=null;}
-    else{loadSheet(res.data||[]);saveSession(token);showApp();}
-  }catch{err.textContent='Connection failed.';sessionToken=null;}
-  btn.disabled=false; btn.textContent='Start Tracking →';
+    if(!res.success){
+      errEl.textContent=res.error||'Server rejected the request.';
+      sessionToken=null; reset();
+    } else {
+      statusEl.textContent='✅ Synced! Loading your habits…';
+      loadSheet(res.data||[]);saveSession(token);
+      setTimeout(()=>{showApp();reset();},600);
+    }
+  }catch{
+    errEl.textContent='Connection failed. Check your internet and try again.';
+    sessionToken=null; reset();
+  }
+
+  function reset(){
+    btn.disabled=false; btnSpinner.style.display='none';
+    btnText.textContent='Start Tracking →';
+  }
 }
 
 function loadSheet(rows){
@@ -1052,27 +1076,34 @@ window.onload=async()=>{
 
   const sess=getSession();
   if(sess?.token){
-    // Re-decrypt credentials from stored token — no plaintext secrets anywhere
+    document.getElementById('loading').style.display='flex';
+    setLoadMsg('🔐 Decrypting credentials…');
     const ok=await decryptCredentials(sess.token);
     if(ok){
       sessionToken=sess.token;
-      document.getElementById('loading').style.display='flex';
+      setLoadMsg('🌐 Syncing your habits…');
       try{
         const res=await apiGet();
         if(res.success){
           loadSheet(res.data||[]);
-          document.getElementById('loading').style.display='none';
-          showApp();return;
+          setLoadMsg('✅ Ready!');
+          setTimeout(()=>{document.getElementById('loading').style.display='none';showApp();},300);
+          return;
         }
       }catch(e){}
       document.getElementById('loading').style.display='none';
-      // API failed but we have local habit data — show app in offline mode
       if(_habits.length>0){showApp();return;}
     }
     sessionToken=null;clearSession();
+    document.getElementById('loading').style.display='none';
   }
   document.getElementById('login-token').focus();
 };
+
+function setLoadMsg(msg){
+  const el=document.getElementById('loading-msg');
+  if(el) el.textContent=msg;
+}
 
 document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none')doLogin();

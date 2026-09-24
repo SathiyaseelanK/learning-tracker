@@ -32,8 +32,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .login-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s;margin-top:4px}
 .login-btn:hover{opacity:.88}
 .login-btn:disabled{opacity:.5;cursor:not-allowed}
-.login-err{font-size:12px;color:var(--red);margin-top:8px;min-height:16px;text-align:center}
-.login-spinner{display:none;font-size:12px;color:var(--text2);margin-top:8px;text-align:center}
+.login-err{font-size:12px;color:var(--red);margin-top:6px;min-height:16px;text-align:center}
+.login-status{font-size:12px;color:var(--green);margin-top:6px;min-height:16px;text-align:center;display:none;align-items:center;justify-content:center;gap:6px}
+.login-status.show{display:flex}
+.login-spinner{display:none;font-size:12px;color:var(--text2);margin-top:6px;text-align:center}
+.login-btn-inner{display:flex;align-items:center;justify-content:center;gap:8px}
+.login-btn-spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
 
 /* ── LOADING ── */
 #loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50;flex-direction:column;gap:12px}
@@ -408,16 +412,21 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
     <input class="inp" id="login-email" type="email" placeholder="your@gmail.com"/>
     <div class="lbl">Access Token</div>
     <input class="inp" id="login-token" type="password" placeholder="Your secret token"/>
-    <button class="login-btn" id="login-btn" onclick="doLogin()">Start Today's Habit →</button>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">
+      <div class="login-btn-inner">
+        <div class="login-btn-spinner" id="login-btn-spinner"></div>
+        <span id="login-btn-text">Start Today's Habit →</span>
+      </div>
+    </button>
+    <div class="login-status" id="login-status"></div>
     <div class="login-err" id="login-err"></div>
-    <div class="login-spinner" id="login-spinner">Syncing your progress…</div>
   </div>
 </div>
 
 <!-- LOADING -->
 <div id="loading" style="display:none">
   <div class="spin"></div>
-  <div style="font-size:13px;color:var(--text2)">Loading your habits…</div>
+  <div id="loading-msg" style="font-size:13px;color:var(--text2);margin-top:4px">Loading…</div>
 </div>
 
 <!-- APP -->
@@ -1092,55 +1101,77 @@ function setSyncState(s){
 async function doLogin(){
   const emailInput = document.getElementById('login-email').value.trim();
   const token      = document.getElementById('login-token').value.trim();
-  const err        = document.getElementById('login-err');
+  const errEl      = document.getElementById('login-err');
+  const statusEl   = document.getElementById('login-status');
   const btn        = document.getElementById('login-btn');
-  err.textContent  = '';
-  if(!emailInput||!token){err.textContent='Please enter email and token.';return;}
+  const btnSpinner = document.getElementById('login-btn-spinner');
+  const btnText    = document.getElementById('login-btn-text');
 
-  btn.disabled = true;
-  document.getElementById('login-spinner').style.display='block';
-  err.textContent = 'Verifying…';
+  // Reset state
+  errEl.textContent    = '';
+  statusEl.textContent = '';
+  statusEl.classList.remove('show');
 
-  // ── STEP 1: Decrypt credentials using the supplied token ──────────────
-  // If the token is wrong, AES-GCM decryption throws — we never reach the API.
+  if(!emailInput||!token){
+    errEl.textContent='Please enter your email and token.';
+    return;
+  }
+
+  // Show loading state on button
+  btn.disabled        = true;
+  btnSpinner.style.display = 'block';
+  btnText.textContent = 'Verifying…';
+  setStatus('🔐 Verifying token…');
+
+  // ── STEP 1: AES-GCM decrypt — wrong token throws here, never reaches network
   const ok = await decryptCredentials(token);
   if(!ok){
-    err.textContent = 'Invalid token — decryption failed.';
-    btn.disabled    = false;
-    document.getElementById('login-spinner').style.display='none';
+    errEl.textContent = 'Invalid token. Please check and try again.';
+    resetBtn();
     return;
   }
 
-  // ── STEP 2: Confirm the email input matches the decrypted email ────────
-  // This provides a second layer — user must know both email AND token.
+  // ── STEP 2: Email must match the decrypted email
   if(emailInput.toLowerCase() !== ALLOWED_EMAIL.toLowerCase()){
-    err.textContent = 'Email does not match this account.';
+    errEl.textContent = 'Email does not match this account.';
     WEBAPP_URL = ALLOWED_EMAIL = SECRET_TOKEN = null;
-    btn.disabled = false;
-    document.getElementById('login-spinner').style.display='none';
+    resetBtn();
     return;
   }
 
-  // ── STEP 3: Hit the API with the now-decrypted URL ────────────────────
-  err.textContent = 'Connecting…';
+  // ── STEP 3: Call Apps Script to load your data
+  btnText.textContent = 'Connecting…';
+  setStatus('🌐 Connecting to Google Sheets…');
   sessionToken = token;
+
   try{
     const res = await apiGet();
     if(!res.success){
-      err.textContent = res.error||'Server rejected the request.';
+      errEl.textContent = res.error || 'Server rejected the request.';
       sessionToken = null;
+      resetBtn();
     } else {
+      setStatus('✅ Synced! Loading your progress…');
       loadSheet(res.data||[]);
       saveSession(token);
-      showApp();
+      // Brief pause so user sees the success message before the app opens
+      setTimeout(()=>{ showApp(); resetBtn(); }, 600);
     }
   }catch(e){
-    err.textContent = 'Connection failed. Check your internet.';
+    errEl.textContent = 'Connection failed. Check your internet and try again.';
     sessionToken = null;
+    resetBtn();
   }
-  err.textContent = '';
-  btn.disabled    = false;
-  document.getElementById('login-spinner').style.display='none';
+
+  function setStatus(msg){
+    statusEl.textContent = msg;
+    statusEl.classList.add('show');
+  }
+  function resetBtn(){
+    btn.disabled             = false;
+    btnSpinner.style.display = 'none';
+    btnText.textContent      = "Start Today's Habit →";
+  }
 }
 
 function loadSheet(rows){
@@ -2385,26 +2416,37 @@ function updateNotifBell(){
 window.onload=async()=>{
   const sess=getSession();
   if(sess?.token){
-    // Re-derive credentials from stored token — never store plaintext URL/email
+    // Show loading screen immediately so user sees feedback
+    document.getElementById('loading').style.display='flex';
+    setLoadingMsg('🔐 Decrypting credentials…');
+
     const ok=await decryptCredentials(sess.token);
     if(ok){
       sessionToken=sess.token;
-      document.getElementById('loading').style.display='flex';
+      setLoadingMsg('🌐 Syncing your progress…');
       try{
         const res=await apiGet();
         if(res.success){
           loadSheet(res.data||[]);
-          document.getElementById('loading').style.display='none';
-          showApp();return;
+          setLoadingMsg('✅ Ready!');
+          setTimeout(()=>{
+            document.getElementById('loading').style.display='none';
+            showApp();
+          },300);
+          return;
         }
       }catch(e){}
-      document.getElementById('loading').style.display='none';
     }
+    document.getElementById('loading').style.display='none';
     sessionToken=null;clearSession();
   }
-  // Login screen — don't pre-fill email (no plaintext credentials in DOM)
   document.getElementById('login-token').focus();
 };
+
+function setLoadingMsg(msg){
+  const el=document.getElementById('loading-msg');
+  if(el) el.textContent=msg;
+}
 
 // (Enter-to-login handled in unified keydown handler at bottom of file)
 
