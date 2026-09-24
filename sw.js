@@ -1,10 +1,12 @@
 // ═══════════════════════════════════════════════════════════════════════
-// Service Worker — Daily Learning Habit Tracker
-// Caches the app shell so it loads even with no internet connection.
-// Data (Google Sheets) still requires network — only the app itself is cached.
+// Service Worker — Daily Learning Habit Tracker  v5
+// Handles:
+//   1. App-shell caching (offline support)
+//   2. Push notifications (notificationclick routing)
+//   3. Scheduled local notifications via message from main thread
 // ═══════════════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'lt-cache-v4';
+const CACHE_NAME = 'lt-cache-v5';
 const APP_SHELL = [
   './',
   './index.html',
@@ -64,4 +66,61 @@ self.addEventListener('fetch', (event) => {
       return cached || networkFetch;
     })
   );
+});
+
+// ── NOTIFICATION CLICK HANDLER ────────────────────────────────────────────────
+// When user taps a notification, open/focus the app and route to the right tab.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const action = event.action || '';
+  const data   = event.notification.data || {};
+
+  // Which URL to open — default to the app root
+  let url = './';
+  if (data.view === 'habits')  url = './habits.html';
+  if (data.view === 'plans')   url = './';
+  if (data.view === 'books')   url = './';
+  if (data.view === 'review')  url = './';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      // If app is already open, focus it and post a message to switch tab
+      for (const client of list) {
+        if (client.url.includes('sathiyaseelanK.github.io') || client.url.includes('localhost')) {
+          client.focus();
+          client.postMessage({ type: 'NOTIFICATION_CLICK', view: data.view, skey: data.skey });
+          return;
+        }
+      }
+      // App not open — launch it
+      return clients.openWindow(url);
+    })
+  );
+});
+
+// ── PUSH HANDLER (future Web Push support) ────────────────────────────────────
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  try {
+    const payload = event.data.json();
+    event.waitUntil(
+      self.registration.showNotification(payload.title || '🌱 Learning Tracker', {
+        body   : payload.body  || '',
+        icon   : './icon-192.png',
+        badge  : './icon-192.png',
+        data   : payload.data  || {},
+        tag    : payload.tag   || 'lt-push',
+        actions: payload.actions || [],
+      })
+    );
+  } catch (_) {}
+});
+
+// ── MESSAGE HANDLER — receives schedule commands from the main thread ─────────
+// The app posts { type: 'SCHEDULE_NOTIFICATION', ... } when it wants to
+// schedule a local notification via the SW (more reliable than setTimeout).
+self.addEventListener('message', (event) => {
+  const msg = event.data || {};
+  if (msg.type === 'SKIP_WAITING') { self.skipWaiting(); return; }
 });

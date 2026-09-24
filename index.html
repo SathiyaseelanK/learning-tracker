@@ -428,6 +428,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
     <div class="topbar-right">
       <div class="streak-pill" id="streak-pill">0🔥</div>
       <a href="docs.html" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 9px;font-size:12px;color:var(--text2);text-decoration:none;cursor:pointer" title="Documentation">📚 Docs</a>
+      <button id="notif-bell" onclick="showNotificationSettings()" aria-label="Notification settings" title="Reminders" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 9px;cursor:pointer;font-size:14px;position:relative">🔔<span id="notif-dot" style="display:none;position:absolute;top:4px;right:4px;width:7px;height:7px;background:var(--green);border-radius:50%;border:1.5px solid var(--bg)"></span></button>
       <button class="theme-btn" onclick="toggleTheme()" id="theme-btn" aria-label="Toggle dark or light theme" title="Toggle theme">☀️</button>
       <div class="user-pill" onclick="logout()" role="button" tabindex="0" aria-label="Sync status and sign out" title="Tap to sign out">
         <div class="sync-dot" id="sync-dot" aria-hidden="true"></div>
@@ -1175,6 +1176,7 @@ function showApp(){
   setTimeout(()=>{
     checkShowOnboarding();
     preCacheQuotes();
+    scheduleAllNotifications(); // arm any enabled reminders
     const dueReviews=getDueReviews();
     if(dueReviews.length>0){
       setTimeout(()=>showToast(`🔁 ${dueReviews.length} review${dueReviews.length>1?'s':''} due — tap B then Review`),2000);
@@ -2369,6 +2371,16 @@ function showToast(msg){
 // ═══════════════════════════════════════════════════════════════════════
 function init(){
   switchView('today');
+  updateNotifBell();
+}
+
+function updateNotifBell(){
+  const dot = document.getElementById('notif-dot');
+  if(!dot) return;
+  const enabled = getNotifPref('enabled');
+  dot.style.display = enabled ? 'block' : 'none';
+  const bell = document.getElementById('notif-bell');
+  if(bell) bell.title = enabled ? 'Reminders ON — tap to configure' : 'Set up reminders';
 }
 
 window.onload=async()=>{
@@ -4199,6 +4211,409 @@ function showKeyboardShortcuts(){
     </div>
     <div class="modal-actions" style="margin-top:12px"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>
   `);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// NOTIFICATION SYSTEM
+// ─────────────────────────────────────────────────────────────────────
+// Works as LOCAL notifications — scheduled in the browser via
+// the Notifications API + setTimeout/localStorage alarms.
+// No push server required. Fires even when the screen is locked,
+// as long as the PWA has been granted notification permission on iOS 16.4+.
+//
+// Reminders configured (all times local to the device):
+//   ⏰ Daily session     — 3:00 PM weekdays  (Mon–Fri)
+//   📖 Reading habit     — 8:00 PM daily
+//   🔁 Spaced repetition — 9:00 AM if reviews are due
+//   🔥 Streak protection — 9:30 PM if nothing done today
+//   ✅ Habit check-in    — 7:00 AM daily
+// ═══════════════════════════════════════════════════════════════════════
+
+// ── NOTIFICATION PREFERENCE STORAGE ──────────────────────────────────
+function getNotifPrefs(){
+  try{ return JSON.parse(localStorage.getItem('lt_notif_prefs')||'{}'); }
+  catch{ return {}; }
+}
+function saveNotifPrefs(p){ localStorage.setItem('lt_notif_prefs', JSON.stringify(p)); }
+
+const NOTIF_DEFAULTS = {
+  enabled        : false,  // master switch — off until user grants permission
+  session        : true,   // 3:00 PM weekday session reminder
+  sessionHour    : 15,
+  sessionMin     : 0,
+  reading        : true,   // 8:00 PM reading reminder
+  readingHour    : 20,
+  readingMin     : 0,
+  habitCheckin   : true,   // 7:00 AM morning habit check-in
+  habitHour      : 7,
+  habitMin       : 0,
+  streakGuard    : true,   // 9:30 PM streak-at-risk warning
+  streakHour     : 21,
+  streakMin      : 30,
+  reviews        : true,   // 9:00 AM spaced-repetition reviews
+  reviewHour     : 9,
+  reviewMin      : 0,
+};
+
+function getNotifPref(key){ return getNotifPrefs()[key] ?? NOTIF_DEFAULTS[key]; }
+
+// ── PERMISSION REQUEST ────────────────────────────────────────────────
+async function requestNotificationPermission(){
+  if(!('Notification' in window)){
+    showToast('❌ Notifications not supported on this browser/device.');
+    return false;
+  }
+  if(Notification.permission === 'granted') return true;
+  if(Notification.permission === 'denied'){
+    showToast('🔕 Notifications blocked. Enable in iOS Settings → Safari → Notifications.');
+    return false;
+  }
+  const result = await Notification.requestPermission();
+  return result === 'granted';
+}
+
+// ── SHOW A NOTIFICATION ───────────────────────────────────────────────
+async function showNotification(title, body, options={}){
+  if(!('Notification' in window) || Notification.permission !== 'granted') return;
+  const reg = await navigator.serviceWorker?.ready;
+  const payload = {
+    body,
+    icon   : './icon-192.png',
+    badge  : './icon-192.png',
+    tag    : options.tag    || 'lt-general',
+    data   : options.data   || {},
+    silent : options.silent || false,
+    requireInteraction: options.sticky || false,
+    ...( options.actions ? { actions: options.actions } : {} ),
+  };
+  if(reg?.showNotification){
+    // Service worker notification — works when app is in background/locked
+    await reg.showNotification(title, payload);
+  } else {
+    // Fallback: direct Notification API (foreground only)
+    new Notification(title, payload);
+  }
+}
+
+// ── ALARM ENGINE ─────────────────────────────────────────────────────
+// Calculates milliseconds until a given hour:minute today (or tomorrow
+// if that time has already passed). Stores pending alarm IDs in
+// localStorage so they survive a page refresh and aren't duplicated.
+
+const _alarmTimers = {};
+
+// ── ALARM ENGINE ─────────────────────────────────────────────────────
+// Returns ms from now until next occurrence of hour:min (today or tomorrow).
+// Handles sub-zero minutes correctly (e.g. 15:00 - 15 = 14:45).
+function msUntil(hour, min, skipWeekends=false){
+  const now    = new Date();
+  // Normalise: allow negative minutes (e.g. min=-15 → hour-1 : 45)
+  let h = hour, m = min;
+  while(m < 0){ m += 60; h -= 1; }
+  while(m >= 60){ m -= 60; h += 1; }
+  const target = new Date(now);
+  target.setHours(h, m, 0, 0);
+  if(target <= now) target.setDate(target.getDate() + 1);
+  if(skipWeekends){
+    while(target.getDay()===0||target.getDay()===6)
+      target.setDate(target.getDate()+1);
+  }
+  return target.getTime() - now.getTime();
+}
+
+function scheduleAlarm(id, hour, min, fn, skipWeekends=false){
+  if(_alarmTimers[id]) clearTimeout(_alarmTimers[id]);
+  const delay = msUntil(hour, min, skipWeekends);
+  _alarmTimers[id] = setTimeout(()=>{
+    fn();
+    scheduleAlarm(id, hour, min, fn, skipWeekends); // re-arm next day
+  }, delay);
+}
+
+function cancelAlarm(id){
+  if(_alarmTimers[id]){ clearTimeout(_alarmTimers[id]); delete _alarmTimers[id]; }
+}
+
+// Session time: 3:00 PM every weekday
+const SESSION_HOUR = 15;
+const SESSION_MIN  = 0;
+
+// ── SCHEDULE ALL REMINDERS ────────────────────────────────────────────
+function scheduleAllNotifications(){
+  const prefs = getNotifPrefs();
+  if(!prefs.enabled) return;
+
+  // ─────────────────────────────────────────────────────────────────
+  // 1. SESSION COUNTDOWN — 15 min, 10 min, 5 min before + 3 PM start
+  //    Weekdays only. Each alert is suppressed if session already done.
+  // ─────────────────────────────────────────────────────────────────
+  if(getNotifPref('session')){
+
+    const skipWeekend = ()=>{ const d=new Date().getDay(); return d===0||d===6; };
+    const alreadyDone = ()=>checkDoneToday();
+
+    // 2:45 PM — 15 minutes before
+    scheduleAlarm('session_15', SESSION_HOUR, SESSION_MIN-15, ()=>{
+      if(skipWeekend()||alreadyDone()) return;
+      const stats = computeStats();
+      showNotification(
+        '⏰ 15 minutes to your session',
+        'Your 3:00 PM learning session starts soon. Get your notes ready.'
+          +(stats.streak>0?' 🔥 '+stats.streak+'-day streak.':''),
+        { tag:'lt-s15', data:{view:'today'},
+          actions:[{action:'open',title:'Open tracker →'}] }
+      );
+    }, true);
+
+    // 2:50 PM — 10 minutes before
+    scheduleAlarm('session_10', SESSION_HOUR, SESSION_MIN-10, ()=>{
+      if(skipWeekend()||alreadyDone()) return;
+      const stats = computeStats();
+      showNotification(
+        '⏰ 10 minutes to your session',
+        'Wrap up what you\'re doing — GCP session at 3:00 PM. Close distractions now.'
+          +(stats.streak>0?' Streak: '+stats.streak+'🔥':''),
+        { tag:'lt-s10', data:{view:'today'},
+          actions:[{action:'open',title:'Get ready →'}] }
+      );
+    }, true);
+
+    // 2:55 PM — 5 minutes before
+    scheduleAlarm('session_5', SESSION_HOUR, SESSION_MIN-5, ()=>{
+      if(skipWeekend()||alreadyDone()) return;
+      showNotification(
+        '🚨 5 minutes — session starts at 3:00 PM!',
+        'Last call. Put your phone down, open the tracker, and begin your session.',
+        { tag:'lt-s5', data:{view:'today'},
+          actions:[{action:'open',title:'Start now →'}],
+          sticky: true }
+      );
+    }, true);
+
+    // 3:00 PM — start now
+    scheduleAlarm('session_now', SESSION_HOUR, SESSION_MIN, ()=>{
+      if(skipWeekend()||alreadyDone()) return;
+      const stats = computeStats();
+      showNotification(
+        '📚 3:00 PM — time to learn!',
+        'Your daily GCP session starts right now.'
+          +(stats.streak>0?' 🔥 '+stats.streak+'-day streak on the line. Don\'t break it!':''),
+        { tag:'lt-snow', data:{view:'plans'},
+          actions:[{action:'open',title:'Open session →'}],
+          sticky: true }
+      );
+    }, true);
+
+  } else {
+    ['session_15','session_10','session_5','session_now'].forEach(cancelAlarm);
+  }
+
+  // 2. Reading reminder
+  if(getNotifPref('reading')){
+    scheduleAlarm('reading', getNotifPref('readingHour'), getNotifPref('readingMin'), ()=>{
+      const reading = _books?.find(b=>b.status==='reading');
+      if(!reading) return;
+      const todayMins = (reading.readingLog||[])
+        .filter(l=>new Date(l.date).toDateString()===new Date().toDateString())
+        .reduce((s,l)=>s+(l.minutes||0),0);
+      if(todayMins < 30){
+        showNotification(
+          '📖 Reading time!',
+          reading.title+' — '+(todayMins>0?todayMins+' min done, '+Math.max(0,60-todayMins)+' min to go':'Start your 1-hour reading session now.'),
+          { tag:'lt-reading', data:{view:'books'},
+            actions:[{action:'open',title:'Start reading →'}] }
+        );
+      }
+    });
+  } else { cancelAlarm('reading'); }
+
+  // 3. Morning habit check-in
+  if(getNotifPref('habitCheckin')){
+    scheduleAlarm('habit', getNotifPref('habitHour'), getNotifPref('habitMin'), ()=>{
+      const habits = typeof getHabits==='function' ? getHabits().filter(h=>isHabitScheduledToday(h)) : [];
+      if(!habits.length) return;
+      showNotification(
+        '✅ Good morning, Sathiya!',
+        habits.length+' habit'+(habits.length>1?'s':'')+' to track today. Start your day strong.',
+        { tag:'lt-habits', data:{view:'habits'},
+          actions:[{action:'open',title:'Check in →'}] }
+      );
+    });
+  } else { cancelAlarm('habit'); }
+
+  // 4. Streak protection
+  if(getNotifPref('streakGuard')){
+    scheduleAlarm('streak', getNotifPref('streakHour'), getNotifPref('streakMin'), ()=>{
+      const stats = computeStats();
+      if(stats.streak<1||checkDoneToday()) return;
+      showNotification(
+        '🔥 Streak at risk!',
+        'Your '+stats.streak+'-day streak ends at midnight. Even a 20-minute session keeps it alive.',
+        { tag:'lt-streak', data:{view:'today'},
+          actions:[{action:'open',title:'Save my streak →'}],
+          sticky: true }
+      );
+    });
+  } else { cancelAlarm('streak'); }
+
+  // 5. Spaced repetition reviews
+  if(getNotifPref('reviews')){
+    scheduleAlarm('reviews', getNotifPref('reviewHour'), getNotifPref('reviewMin'), ()=>{
+      const due = typeof getDueReviews==='function' ? getDueReviews() : [];
+      if(!due.length) return;
+      showNotification(
+        '🔁 '+due.length+' review'+(due.length>1?'s':'')+' due',
+        'Revisiting past sessions now locks in long-term memory. Takes 5 minutes.',
+        { tag:'lt-reviews', data:{view:'review'},
+          actions:[{action:'open',title:'Review now →'}] }
+      );
+    });
+  } else { cancelAlarm('reviews'); }
+}
+
+// Helper — did the user complete any session today?
+function checkDoneToday(){
+  const today = new Date().toDateString();
+  return enabledPlans.some(pid=>{
+    const plan = PLAN_REGISTRY[pid]; if(!plan) return false;
+    return plan.sessions.some(m=>{
+      const s = state[sk(pid,m.id)];
+      return s?.status==='completed' && s.updatedAt &&
+             new Date(s.updatedAt).toDateString()===today;
+    });
+  });
+}
+
+// ── NOTIFICATION SETTINGS MODAL ───────────────────────────────────────
+function showNotificationSettings(){
+  const prefs  = getNotifPrefs();
+  const enabled = prefs.enabled ?? false;
+  const perm   = 'Notification' in window ? Notification.permission : 'unsupported';
+
+  const row = (id, label, icon, defaultOn=true) => {
+    const checked = (prefs[id] ?? defaultOn) ? 'checked' : '';
+    const h = getNotifPref(id+'Hour'); const m = getNotifPref(id+'Min');
+    const timeStr = h !== undefined ? ` · ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}` : '';
+    return `
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:20px;width:28px;text-align:center">${icon}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600">${label}</div>
+          <div style="font-size:11px;color:var(--text3)">${timeStr}</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer">
+          <input type="checkbox" id="np-${id}" ${checked} ${!enabled?'disabled':''} onchange="saveNotifPrefToggle('${id}',this.checked)"
+            style="opacity:0;width:0;height:0;position:absolute">
+          <span style="position:absolute;inset:0;background:${(prefs[id]??defaultOn)&&enabled?'var(--green)':'var(--border2)'};border-radius:22px;transition:background .2s"></span>
+          <span style="position:absolute;top:3px;left:${(prefs[id]??defaultOn)&&enabled?'21':'3'}px;width:16px;height:16px;background:#fff;border-radius:50%;transition:left .2s"></span>
+        </label>
+      </div>`;
+  };
+
+  showModal(`
+    <div class="modal-title">🔔 Notification Reminders</div>
+    ${perm==='unsupported'?`
+      <div style="background:rgba(240,78,78,.08);border:1px solid rgba(240,78,78,.2);border-radius:8px;padding:12px;font-size:13px;color:var(--red);margin-bottom:14px">
+        ❌ Notifications are not supported on this browser.<br>
+        <span style="color:var(--text2);font-size:11px">Use Safari on iPhone with iOS 16.4+ and add to Home Screen.</span>
+      </div>`
+    :perm==='denied'?`
+      <div style="background:rgba(240,78,78,.08);border:1px solid rgba(240,78,78,.2);border-radius:8px;padding:12px;font-size:13px;margin-bottom:14px">
+        <div style="font-weight:600;color:var(--red);margin-bottom:4px">🔕 Notifications are blocked</div>
+        <div style="color:var(--text2);font-size:12px;line-height:1.6">To enable:<br>
+          <strong>iPhone:</strong> Settings → Safari → Notifications → Allow<br>
+          <strong>Android:</strong> Settings → Apps → Chrome → Notifications → Allow
+        </div>
+      </div>`
+    :`
+      <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:16px">
+        <div>
+          <div style="font-size:14px;font-weight:700">Enable reminders</div>
+          <div style="font-size:11px;color:var(--text2)">Status: <span style="color:${perm==='granted'?'var(--green)':'var(--yellow)'}">${perm==='granted'?'✅ Allowed':'⚠️ '+perm}</span></div>
+        </div>
+        <label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer">
+          <input type="checkbox" id="np-master" ${enabled?'checked':''} onchange="toggleNotifMaster(this.checked)"
+            style="opacity:0;width:0;height:0;position:absolute">
+          <span id="np-master-bg" style="position:absolute;inset:0;background:${enabled?'var(--green)':'var(--border2)'};border-radius:26px;transition:background .2s"></span>
+          <span id="np-master-dot" style="position:absolute;top:4px;left:${enabled?'26':'4'}px;width:18px;height:18px;background:#fff;border-radius:50%;transition:left .2s"></span>
+        </label>
+      </div>
+      <div id="np-rows" style="opacity:${enabled?1:.45};pointer-events:${enabled?'auto':'none'};transition:opacity .2s">
+        ${row('session',    'Session reminders (2:45 · 2:50 · 2:55 · 3:00 PM)','📚', true)}
+        ${row('habitCheckin','Morning habit check-in','✅', true)}
+        ${row('streakGuard','Streak protection',  '🔥', true)}
+        ${row('reading',    'Reading reminder',   '📖', true)}
+        ${row('reviews',    'Spaced repetition',  '🔁', true)}
+      </div>
+      <div style="margin-top:14px">
+        <button onclick="sendTestNotification()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer">
+          🧪 Send test notification
+        </button>
+      </div>
+    `}
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Done</button></div>
+  `);
+}
+
+async function toggleNotifMaster(on){
+  if(on){
+    const granted = await requestNotificationPermission();
+    if(!granted){
+      document.getElementById('np-master').checked = false;
+      return;
+    }
+  }
+  const prefs = getNotifPrefs();
+  prefs.enabled = on;
+  saveNotifPrefs(prefs);
+  // Update toggle visuals
+  const bg  = document.getElementById('np-master-bg');
+  const dot = document.getElementById('np-master-dot');
+  if(bg)  bg.style.background  = on ? 'var(--green)' : 'var(--border2)';
+  if(dot) dot.style.left       = on ? '26px' : '4px';
+  // Enable/disable sub-rows
+  const rows = document.getElementById('np-rows');
+  if(rows){ rows.style.opacity = on?'1':'0.45'; rows.style.pointerEvents = on?'auto':'none'; }
+
+  if(on){
+    scheduleAllNotifications();
+    showToast('🔔 Reminders enabled! You\'ll get a test notification in 5 seconds.');
+    setTimeout(()=>sendTestNotification(true), 5000);
+  } else {
+    ['session_15','session_10','session_5','session_now','reading','habit','streak','reviews'].forEach(cancelAlarm);
+    showToast('🔕 All reminders turned off.');
+  }
+}
+
+function saveNotifPrefToggle(key, val){
+  const prefs = getNotifPrefs();
+  prefs[key] = val;
+  saveNotifPrefs(prefs);
+  scheduleAllNotifications(); // re-arm with new settings
+}
+
+function sendTestNotification(silent=false){
+  // Show a realistic preview of the 3 PM countdown sequence
+  showNotification(
+    '⏰ Test — 15 minutes to your session',
+    'This is what the 2:45 PM reminder looks like. Real alerts fire at 2:45, 2:50, 2:55 and 3:00 PM on weekdays.',
+    { tag:'lt-test', data:{view:'today'} }
+  );
+  if(!silent) showToast('🔔 Test sent — check your notifications!');
+}
+
+// Listen for messages from the service worker (notification tap routing)
+if(navigator.serviceWorker){
+  navigator.serviceWorker.addEventListener('message', e=>{
+    const msg = e.data || {};
+    if(msg.type==='NOTIFICATION_CLICK'){
+      if(msg.view==='habits')  { switchView('habits');  }
+      if(msg.view==='plans')   { switchView('plans');   }
+      if(msg.view==='books')   { switchView('books');   }
+      if(msg.view==='today')   { switchView('today');   }
+      if(msg.view==='review')  { showDueReviews();      }
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════
