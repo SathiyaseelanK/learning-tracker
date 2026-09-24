@@ -152,6 +152,9 @@ kbd{background:var(--surface2);border:1px solid var(--border2);border-radius:5px
 
   <div class="sb-section">
     <div class="sb-section-title">Tools</div>
+    <a class="sb-link" onclick="show('headertools')"><span class="sb-link-icon">🛠️</span>Header Tools Menu</a>
+    <a class="sb-link" onclick="show('tasklist')"><span class="sb-link-icon">✅</span>Task List</a>
+    <a class="sb-link" onclick="show('techniques')"><span class="sb-link-icon">⏳</span>Focus Techniques</a>
     <a class="sb-link" onclick="show('timers')"><span class="sb-link-icon">⏱️</span>Pomodoro & Timers</a>
     <a class="sb-link" onclick="show('gamification')"><span class="sb-link-icon">⭐</span>XP, Levels & Achievements</a>
     <a class="sb-link" onclick="show('journal')"><span class="sb-link-icon">📔</span>Journal & Reflection</a>
@@ -161,8 +164,10 @@ kbd{background:var(--surface2);border:1px solid var(--border2);border-radius:5px
   </div>
 
   <div class="sb-section">
-    <div class="sb-section-title">Data & Sync</div>
+    <div class="sb-section-title">Data, Sync & Security</div>
     <a class="sb-link" onclick="show('sync')"><span class="sb-link-icon">🔄</span>Google Sheets Sync</a>
+    <a class="sb-link" onclick="show('security')"><span class="sb-link-icon">🔐</span>Security</a>
+    <a class="sb-link" onclick="show('notifications')"><span class="sb-link-icon">🔔</span>Notifications</a>
     <a class="sb-link" onclick="show('export')"><span class="sb-link-icon">📄</span>Export & Reports</a>
   </div>
 
@@ -245,7 +250,7 @@ kbd{background:var(--surface2);border:1px solid var(--border2);border-radius:5px
     <tr><td>Apps Script URL</td><td>Deployed Web App (secured by token)</td></tr>
   </table>
 
-  <div class="callout callout-warn">Never share your token. It is the key to your data. The token is stored in <code>sessionStorage</code> — it clears automatically when you close the browser tab.</div>
+  <div class="callout callout-warn">Never share your token. It is the key to your data. It's encrypted before being stored — see <a onclick="show('security')" style="cursor:pointer">Security</a> for exactly how — and persists up to 30 days if you keep "Stay logged in" ticked, or clears on tab close if you untick it.</div>
 
   <h2>Login Steps</h2>
   <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Open index.html</div><div class="step-desc">Open via GitHub Pages URL or directly from your desktop. The login screen appears automatically.</div></div></div>
@@ -254,13 +259,18 @@ kbd{background:var(--surface2);border:1px solid var(--border2);border-radius:5px
   <div class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">Auto-sync</div><div class="step-desc">Progress loads from Google Sheets. The green dot in the top-right means you are synced.</div></div></div>
 
   <h2>Staying Logged In</h2>
-  <p>The tracker stores your token in <code>sessionStorage</code>. This means:</p>
+  <p>Tick <strong>"Stay logged in on this device"</strong> at login (checked by default). Your token is encrypted with a device-bound key stored in IndexedDB and the ciphertext saved to <code>localStorage</code> — see <a onclick="show('security')" style="cursor:pointer">Security</a> for how that encryption works.</p>
   <table>
     <tr><th>Situation</th><th>Result</th></tr>
     <tr><td>Refresh the page</td><td>✅ Still logged in</td></tr>
-    <tr><td>Open same tab</td><td>✅ Still logged in</td></tr>
-    <tr><td>Close the tab / browser</td><td>🔒 Logged out — re-enter token</td></tr>
-    <tr><td>Open in new tab</td><td>🔒 Logged out — re-enter token</td></tr>
+    <tr><td>Close the tab / browser, reopen later</td><td>✅ Still logged in — up to 30 days</td></tr>
+    <tr><td>30 days with no use</td><td>🔒 Session auto-expires — re-enter token</td></tr>
+    <tr><td>"Stay logged in" unticked</td><td>🔒 Logged out as soon as you close the tab</td></tr>
+    <tr><td>Tap your name in the header</td><td>🔒 Signs out immediately, on purpose</td></tr>
+  </table>
+
+  <h2>One Login for Both Pages</h2>
+  <p><code>index.html</code> and <code>habits.html</code> share a single sign-on. Clicking between "Habits" and "← Learning" hands off your active session directly through the navigation itself — never over the network, never through any server — so there's no repeated login screen and no delay switching between them.</p>
   </table>
 
   <h2>Accessing on Mobile (iPhone)</h2>
@@ -296,7 +306,8 @@ kbd{background:var(--surface2);border:1px solid var(--border2);border-radius:5px
     <tr><td>Saved quotes</td><td>localStorage</td><td>✅ Per device</td></tr>
     <tr><td>Journal entries</td><td>localStorage</td><td>✅ Per device</td></tr>
     <tr><td>Bookmarks</td><td>localStorage</td><td>✅ Per device</td></tr>
-    <tr><td>Login token</td><td>sessionStorage</td><td>🔒 Tab only</td></tr>
+    <tr><td>Tasks, Time Blocks, GTD, Eisenhower, Frog log, Chains</td><td>localStorage + Sheets</td><td>✅ Yes</td></tr>
+    <tr><td>Login session</td><td>AES-GCM encrypted in localStorage, key in IndexedDB</td><td>🔒 30-day auto-expiry — see <a onclick="show('security')" style="cursor:pointer">Security</a></td></tr>
     <tr><td>Theme preference</td><td>localStorage</td><td>✅ Yes</td></tr>
   </table>
 </div>
@@ -489,6 +500,113 @@ kbd{background:var(--surface2);border:1px solid var(--border2);border-radius:5px
 </div>
 
 <!-- ── TIMERS ──────────────────────────────────────────────── -->
+<div class="section" id="sec-headertools">
+  <h1>🛠️ Header Tools Menu</h1>
+  <p>Tap the <strong>🛠️</strong> icon in the top bar — it works identically on every tab (Today, Dashboard, Plans, Books, Quotes). Nothing here is tied to a specific view anymore; open it from wherever you are.</p>
+
+  <table>
+    <tr><th>Tool</th><th>What it does</th></tr>
+    <tr><td>🍅 Pomodoro</td><td>25/5/15 focus cycle</td></tr>
+    <tr><td>⏱️ 2h Timer</td><td>Countdown for your daily session slot</td></tr>
+    <tr><td>✅ Tasks</td><td>Quick to-do list — see <a onclick="show('tasklist')" style="cursor:pointer">Task List</a></td></tr>
+    <tr><td>📝 Notes</td><td>Every session note you've written</td></tr>
+    <tr><td>📊 Summary</td><td>This week's progress, copy to clipboard</td></tr>
+    <tr><td>📔 Journal</td><td>Daily reflection prompts</td></tr>
+    <tr><td>🧊 Freeze</td><td>Streak protection tokens</td></tr>
+    <tr><td>🎯 Focus</td><td>Distraction-free mode</td></tr>
+    <tr><td>🔖 Bookmarks</td><td>Saved guide steps</td></tr>
+    <tr><td>📊 Monthly</td><td>Full month report</td></tr>
+    <tr><td>🔁 Reviews</td><td>Spaced-repetition sessions due</td></tr>
+    <tr><td>🔍 Search</td><td>Command palette (<kbd>Ctrl/⌘+K</kbd>)</td></tr>
+    <tr><td>⌨️ Shortcuts</td><td>Full keyboard shortcut list</td></tr>
+    <tr><td>⏳ Techniques</td><td>Opens the 9-technique picker — see <a onclick="show('techniques')" style="cursor:pointer">Focus Techniques</a></td></tr>
+  </table>
+
+  <div class="callout callout-tip">This used to only exist inside the Today view — switching to Dashboard or Plans meant losing access to Pomodoro, Journal, etc. entirely. Moving it to the shared header fixed that for good.</div>
+</div>
+
+<!-- ── TASK LIST ──────────────────────────────────────────── -->
+<div class="section" id="sec-tasklist">
+  <h1>✅ Task List</h1>
+  <p>A plain to-do list, reachable from 🛠️ Tools on any page.</p>
+
+  <h2>Using it</h2>
+  <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Add a task</div><div class="step-desc">Type into the input and press Enter, or tap Add.</div></div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Complete it</div><div class="step-desc">Tap the checkbox — or the task text itself — and it strikes through and greys out.</div></div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Undo or delete</div><div class="step-desc">Tap again to un-complete. Tap 🗑️ to delete outright.</div></div></div>
+
+  <table>
+    <tr><th>Behaviour</th><th>Detail</th></tr>
+    <tr><td>Sorting</td><td>Completed tasks automatically sink to the bottom</td></tr>
+    <tr><td>Counter</td><td>Header shows a live "N left" count</td></tr>
+    <tr><td>Bulk clear</td><td>Once something's completed, a "Clear N completed" link appears</td></tr>
+    <tr><td>Sync</td><td>Stored under <code>meta:tasks</code> — same on phone and laptop</td></tr>
+  </table>
+</div>
+
+<!-- ── FOCUS TECHNIQUES ──────────────────────────────────────── -->
+<div class="section" id="sec-techniques">
+  <h1>⏳ Focus Techniques</h1>
+  <p>Nine techniques, one picker — tap 🛠️ Tools → <strong>⏳ Techniques</strong>. Pick whichever fits the work in front of you.</p>
+
+  <h2>Timer-based techniques</h2>
+  <p>Four of these share one underlying timer engine — only <strong>Flowtime</strong> works differently, since it has no fixed target.</p>
+  <table>
+    <tr><th>Technique</th><th>Cycle</th><th>Best for</th></tr>
+    <tr><td>🍅 Pomodoro</td><td>25 min focus / 5 min break (15 min every 4th)</td><td>Default — reliable, well-tested rhythm</td></tr>
+    <tr><td>🎬 Animedoro</td><td>25 min focus / 23 min break</td><td>When your break needs to fit a real anime episode</td></tr>
+    <tr><td>⚡ 52/17 Rule</td><td>52 min focus / 17 min break</td><td>DeskTime's data-backed "most productive" ratio</td></tr>
+    <tr><td>🌊 Ultradian Rhythm</td><td>90 min focus / 20 min recovery</td><td>Matches your body's natural ~90-min energy cycle</td></tr>
+    <tr><td>🌀 Flowtime</td><td>Open-ended — counts <strong>up</strong>, not down</td><td>Deep work where a timer cutting you off mid-flow would hurt more than help</td></tr>
+  </table>
+
+  <h3>How Flowtime works</h3>
+  <p>Tap Start, work until you naturally lose focus, then tap ✕ to stop. It reads how long you actually worked and suggests a break sized to match:</p>
+  <table>
+    <tr><th>Worked</th><th>Suggested break</th></tr>
+    <tr><td>Under 25 min</td><td>5 min</td></tr>
+    <tr><td>25–49 min</td><td>8 min</td></tr>
+    <tr><td>50–89 min</td><td>10 min</td></tr>
+    <tr><td>90 min+</td><td>15 min</td></tr>
+  </table>
+
+  <h2>Planning methodologies</h2>
+  <p>Five standalone tools, each with its own persistent data synced to your Sheet.</p>
+
+  <h3>🗓️ Time Blocking / Timeboxing</h3>
+  <p>Assign every task a slot on today's clock. Add a start time, end time, and label; blocks list sorted chronologically; check off as you go.</p>
+
+  <h3>📥 Getting Things Done (GTD)</h3>
+  <p>Quick-capture anything on your mind into an Inbox, then move each item through buckets:</p>
+  <table>
+    <tr><th>Bucket</th><th>Meaning</th></tr>
+    <tr><td>📥 Inbox</td><td>Just captured, not yet processed</td></tr>
+    <tr><td>▶️ Next Action</td><td>The very next physical step</td></tr>
+    <tr><td>⏳ Waiting For</td><td>Blocked on someone else</td></tr>
+    <tr><td>💭 Someday</td><td>Maybe later, not now</td></tr>
+    <tr><td>📚 Reference</td><td>No action needed, keep for lookup</td></tr>
+    <tr><td>✅ Done</td><td>Completed</td></tr>
+  </table>
+
+  <h3>🧭 Eisenhower Matrix</h3>
+  <p>Add a task, tag it Urgent and/or Important, and it auto-sorts into one of four quadrants:</p>
+  <table>
+    <tr><th>Quadrant</th><th>Tags</th><th>Action</th></tr>
+    <tr><td>🔥 Do First</td><td>Urgent + Important</td><td>Handle immediately</td></tr>
+    <tr><td>📅 Schedule</td><td>Important, not Urgent</td><td>Block time for it later</td></tr>
+    <tr><td>🤝 Delegate</td><td>Urgent, not Important</td><td>Hand it to someone else</td></tr>
+    <tr><td>🗑️ Eliminate</td><td>Neither</td><td>Drop it</td></tr>
+  </table>
+
+  <h3>🐸 Eat The Frog</h3>
+  <p>Set today's hardest, most important task first thing. One button — "I ate the frog" — marks it done, and the tool tracks your streak of eating the frog <em>before</em> anything else, every day.</p>
+
+  <h3>⛓️ Don't Break the Chain</h3>
+  <p>Jerry Seinfeld's method. Name any habit, tap today's cell every day you do it, watch a 70-day chain build on a heatmap grid. Shows your current streak per chain.</p>
+
+  <div class="callout callout-info">All five sync to <code>meta:timeblocks</code>, <code>meta:gtd</code>, <code>meta:eisenhower</code>, <code>meta:frogLog</code>, and <code>meta:chains</code> respectively.</div>
+</div>
+
 <div class="section" id="sec-timers">
   <h1>⏱️ Pomodoro & Timers</h1>
   <p>Three timer modes in a floating widget (bottom-left corner).</p>
@@ -672,6 +790,72 @@ kbd{background:var(--surface2);border:1px solid var(--border2);border-radius:5px
 </div>
 
 <!-- ── EXPORT ──────────────────────────────────────────────── -->
+<div class="section" id="sec-security">
+  <h1>🔐 Security</h1>
+  <p>Built as if it might genuinely be attacked, not just as a personal convenience app. No system is "unhackable" — but every realistic attack path against this specific app has been closed.</p>
+
+  <h2>Credential encryption</h2>
+  <p><code>WEBAPP_URL</code>, your email, and the Apps Script server key are each <strong>AES-GCM 256-bit encrypted</strong> and stored as ciphertext blobs directly in the page source — never in plain text.</p>
+  <table>
+    <tr><th>Step</th><th>Detail</th></tr>
+    <tr><td>Passphrase</td><td>Your login token — never sent to any server</td></tr>
+    <tr><td>Key derivation</td><td>PBKDF2, 100,000 iterations, SHA-256</td></tr>
+    <tr><td>Salts</td><td>Distinct per value — email, URL, and server key each use a different salt</td></tr>
+    <tr><td>Wrong token</td><td>Decryption throws before any network request is made</td></tr>
+  </table>
+
+  <h2>Session persistence</h2>
+  <p>On login, a <strong>non-extractable</strong> AES-GCM key is generated via the Web Crypto API and stored in IndexedDB — even DevTools cannot read it out as raw bytes. Your token is encrypted with that key before being written to <code>localStorage</code>; the device key never leaves IndexedDB. Auto-expires after 30 days of inactivity, resetting on every use.</p>
+
+  <h2>Brute-force protection</h2>
+  <table>
+    <tr><th>Layer</th><th>Rule</th></tr>
+    <tr><td>Client-side</td><td>5 free attempts, then exponential backoff: 30s → 1m → 2m → 4m… capped at 30 min, live countdown shown</td></tr>
+    <tr><td>Server-side (Apps Script)</td><td>Max 30 requests/min total, max 8 failed-auth requests/min</td></tr>
+  </table>
+
+  <h2>XSS prevention</h2>
+  <p>Every piece of user-typed text — session notes, journal entries, book reviews, habit names, task text, custom plan titles — is run through <code>escapeHtml()</code>/<code>escapeAttr()</code> before ever touching the page. This closes "stored XSS": malicious HTML/JS typed into a text field can no longer execute the next time it's displayed.</p>
+
+  <h2>Backend hardening (Code.gs)</h2>
+  <table>
+    <tr><th>Protection</th><th>What it stops</th></tr>
+    <tr><td>Constant-time token comparison</td><td>Timing attacks that guess the token character by character</td></tr>
+    <tr><td>Formula-injection guard</td><td>Notes starting with <code>= + - @</code> neutralized before writing to Sheets — prevents <code>=IMPORTXML(...)</code>-style data exfiltration if the sheet is opened</td></tr>
+    <tr><td>Input validation</td><td><code>moduleId</code> must match a strict safe pattern; <code>note</code>/<code>status</code> length-capped</td></tr>
+  </table>
+
+  <h2>Other hardening</h2>
+  <table>
+    <tr><th>Protection</th><th>Detail</th></tr>
+    <tr><td>Content-Security-Policy</td><td>Restricts which domains the app can ever send data to</td></tr>
+    <tr><td>Clickjacking guard</td><td>Detects and escapes being embedded in an unexpected iframe</td></tr>
+    <tr><td>Tabnabbing protection</td><td><code>rel="noopener noreferrer"</code> on every external link</td></tr>
+    <tr><td>Sync queue token stripping</td><td>The offline write queue never persists the auth token to localStorage — only attaches it at the instant of the actual request</td></tr>
+  </table>
+
+  <div class="callout callout-warn">The sync-queue fix above closed a real, previously-shipped issue: an earlier version leaked the decrypted server token into plaintext localStorage via the offline queue. If you've used an earlier build, the app scrubs it automatically on next load.</div>
+</div>
+
+<div class="section" id="sec-notifications">
+  <h1>🔔 Notifications</h1>
+  <p>Local notifications, scheduled entirely on-device — no push server needed. Tap the <strong>🔔 bell</strong> in the header to set up.</p>
+
+  <table>
+    <tr><th>Reminder</th><th>Time</th><th>Fires when</th></tr>
+    <tr><td>✅ Morning habit check-in</td><td>7:00 AM</td><td>Always</td></tr>
+    <tr><td>⏰ Session — 15 min</td><td>2:45 PM</td><td>Weekday, session not yet done</td></tr>
+    <tr><td>⏰ Session — 10 min</td><td>2:50 PM</td><td>Weekday, session not yet done</td></tr>
+    <tr><td>🚨 Session — 5 min</td><td>2:55 PM</td><td>Weekday, session not yet done</td></tr>
+    <tr><td>📚 Session — now</td><td>3:00 PM</td><td>Weekday, session not yet done</td></tr>
+    <tr><td>📖 Reading reminder</td><td>8:00 PM</td><td>Under 30 min read today</td></tr>
+    <tr><td>🔥 Streak at risk</td><td>9:30 PM</td><td>Streak ≥1, nothing done today</td></tr>
+    <tr><td>🔁 Reviews due</td><td>9:00 AM</td><td>Spaced-repetition reviews pending</td></tr>
+  </table>
+
+  <div class="callout callout-info">Requires iOS 16.4+ (installed as a PWA via Add to Home Screen) or any modern Android/desktop Chrome. On iPhone, notifications only work once the app has been added to your home screen — a browser tab alone can't schedule them.</div>
+</div>
+
 <div class="section" id="sec-export">
   <h1>📄 Export & Reports</h1>
 
@@ -730,7 +914,19 @@ kbd{background:var(--surface2);border:1px solid var(--border2);border-radius:5px
 <div class="section" id="sec-changelog">
   <h1>📋 Changelog</h1>
 
-  <h3>v3.0 — Current</h3>
+  <h3>v4.0 — Current</h3>
+  <table>
+    <tr><th>Change</th><th>Detail</th></tr>
+    <tr><td>🔐 Security hardening</td><td>AES-GCM encrypted credentials, IndexedDB non-extractable session key, stored-XSS prevention, brute-force lockout, CSP, clickjacking guard</td></tr>
+    <tr><td>🩹 Token-leak fix</td><td>Offline sync queue was persisting the auth token in plaintext localStorage — fixed and auto-scrubbed for existing users</td></tr>
+    <tr><td>🔗 Single sign-on</td><td>index.html and habits.html now share one login — direct session handoff on navigation, no repeated login screens</td></tr>
+    <tr><td>🛠️ Header Tools Menu</td><td>All tools moved into the header — work identically on every tab, not just Today</td></tr>
+    <tr><td>✅ Task List</td><td>Simple to-do list with strikethrough completion</td></tr>
+    <tr><td>⏳ Focus Techniques</td><td>9 techniques added — Flowtime, Animedoro, Time Blocking, 52/17 Rule, Ultradian Rhythm, GTD, Eisenhower Matrix, Eat The Frog, Don't Break the Chain</td></tr>
+    <tr><td>🔔 Local Notifications</td><td>Session countdown reminders (15/10/5-min + on-time), habit check-in, reading, streak-at-risk, reviews-due — all on-device, no push server</td></tr>
+  </table>
+
+  <h3>v3.0</h3>
   <table>
     <tr><th>Change</th><th>Detail</th></tr>
     <tr><td>✅ Habits Tracker</td><td>Separate habits.html page — full CRUD, presets, heatmap, stats, achievements</td></tr>

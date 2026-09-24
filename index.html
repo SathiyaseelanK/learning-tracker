@@ -579,8 +579,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 // To re-generate these blobs (e.g. if you change the URL or token):
 //   Run the encrypt-credentials.html tool and paste the new values here.
 // ═══════════════════════════════════════════════════════════════════════
-const ENC_URL = 'Uk/SJMQFnWyQt5ykBOm9REYfO3S/FxnenJNHnjX2gWR59XKL8o4chhO1T7dATKkPByzDNL7QkCsUMloS33aMdoQWZKWfGpMzmBu8/CBmy03ExT3/0xJt8697yFeyRqiI7owA4wp5vO0ddSjkW4xMFKG2/ImiYilU24MDQ647Ma8w3cwZBssXPp5pbdg=';
-const ENC_EMAIL = 'AqGz5W8eMOsR6anaRemcTGJAN6HijUfQt12k2CzzGOA5k3mb9Jmv1Eb8nEc8/Z5uKgAl';
+const ENC_URL       = 'Uk/SJMQFnWyQt5ykBOm9REYfO3S/FxnenJNHnjX2gWR59XKL8o4chhO1T7dATKkPByzDNL7QkCsUMloS33aMdoQWZKWfGpMzmBu8/CBmy03ExT3/0xJt8697yFeyRqiI7owA4wp5vO0ddSjkW4xMFKG2/ImiYilU24MDQ647Ma8w3cwZBssXPp5pbdg=';
+const ENC_EMAIL     = 'AqGz5W8eMOsR6anaRemcTGJAN6HijUfQt12k2CzzGOA5k3mb9Jmv1Eb8nEc8/Z5uKgAl';
 const ENC_SERVERKEY = 'vOLIF4vrC1GDhNrlRoNidSUWpsmynD09sltRoxQCcU0Ws6PjyciIGa8kgvE=';
 const SESSION_KEY = 'lt_habit_v1';
 
@@ -1578,6 +1578,19 @@ function loadSheet(rows){
   // Load habits data
   const habitsRow=rows.find(r=>r.moduleId==='meta:habits');
   if(habitsRow?.status) loadHabits(habitsRow.status);
+  // Load focus-technique tools data
+  const tbRow=rows.find(r=>r.moduleId==='meta:timeblocks');
+  if(tbRow?.status) loadTimeBlocks(tbRow.status);
+  const gtdRow=rows.find(r=>r.moduleId==='meta:gtd');
+  if(gtdRow?.status) loadGTD(gtdRow.status);
+  const eisenRow=rows.find(r=>r.moduleId==='meta:eisenhower');
+  if(eisenRow?.status) loadEisenhower(eisenRow.status);
+  const frogRow=rows.find(r=>r.moduleId==='meta:frogLog');
+  if(frogRow?.status) loadFrogLog(frogRow.status);
+  const chainsRow=rows.find(r=>r.moduleId==='meta:chains');
+  if(chainsRow?.status) loadChains(chainsRow.status);
+  const tasksRow=rows.find(r=>r.moduleId==='meta:tasks');
+  if(tasksRow?.status) loadTasks(tasksRow.status);
 }
 
 function showApp(){
@@ -2624,18 +2637,81 @@ let _timerSecs=0,_timerRunning=false,_timerInterval=null,_timerMode='session',_t
 let _pomPhase='work',_pomCount=0;
 const PW=25*60,PS=5*60,PL=15*60;
 
+// Generalized fixed-cycle config — set fresh by whichever technique starts
+// the timer. Pomodoro is just the default values below.
+let _pomWorkSecs=PW, _pomShortBreakSecs=PS, _pomLongBreakSecs=PL, _pomCyclesUntilLong=4;
+let _pomWorkLabel='🍅 FOCUS', _pomBreakLabel='☕ BREAK', _pomLongBreakLabel='😴 LONG BREAK';
+let _pomTechniqueId='pomodoro';
+
 function startTimer(mins){
   clearInterval(_timerInterval);_timerMode='session';_timerTotal=mins*60;_timerSecs=mins*60;_timerRunning=true;
   document.getElementById('tw-label').textContent='⏱️ SESSION';
   document.getElementById('timer-widget').classList.add('visible');
   _timerInterval=setInterval(tickTimer,1000);updateTimerUI();
 }
-function startPomodoro(){
-  clearInterval(_timerInterval);_timerMode='pomodoro';_pomPhase='work';_pomCount=0;_timerTotal=PW;_timerSecs=PW;_timerRunning=true;
-  document.getElementById('tw-label').textContent='🍅 POMODORO';
+
+// ── GENERIC FIXED-CYCLE STARTER ──────────────────────────────────────
+// Every work/break technique (Pomodoro, Animedoro, 52/17, Ultradian
+// Rhythms) is the same engine with different durations. One tested
+// implementation, four techniques — rather than four near-duplicate
+// timers that could drift out of sync with each other over time.
+function startFocusCycle(opts){
+  clearInterval(_timerInterval);
+  _timerMode='pomodoro'; // reuses the same tick/UI path deliberately
+  _pomPhase='work';_pomCount=0;
+  _pomWorkSecs=opts.workMin*60;
+  _pomShortBreakSecs=opts.breakMin*60;
+  _pomLongBreakSecs=(opts.longBreakMin||opts.breakMin)*60;
+  _pomCyclesUntilLong=opts.cyclesUntilLong||4;
+  _pomWorkLabel=opts.workLabel||'🎯 FOCUS';
+  _pomBreakLabel=opts.breakLabel||'☕ BREAK';
+  _pomLongBreakLabel=opts.longBreakLabel||_pomBreakLabel;
+  _pomTechniqueId=opts.techniqueId||'custom';
+  _timerTotal=_pomWorkSecs;_timerSecs=_pomWorkSecs;_timerRunning=true;
+  document.getElementById('tw-label').textContent=opts.widgetLabel||_pomWorkLabel;
   document.getElementById('timer-widget').classList.add('visible');
   _timerInterval=setInterval(tickPomodoro,1000);updateTimerUI();
 }
+
+function startPomodoro(){
+  startFocusCycle({workMin:25,breakMin:5,longBreakMin:15,cyclesUntilLong:4,
+    widgetLabel:'🍅 POMODORO',workLabel:'🍅 FOCUS',breakLabel:'☕ BREAK',longBreakLabel:'😴 LONG BREAK',techniqueId:'pomodoro'});
+}
+function startAnimedoro(){
+  startFocusCycle({workMin:25,breakMin:23,cyclesUntilLong:999,
+    widgetLabel:'🎬 ANIMEDORO',workLabel:'📚 FOCUS',breakLabel:'🍿 ANIME BREAK',techniqueId:'animedoro'});
+}
+function start5217(){
+  startFocusCycle({workMin:52,breakMin:17,cyclesUntilLong:999,
+    widgetLabel:'⚡ 52/17 RULE',workLabel:'⚡ FOCUS',breakLabel:'☕ BREAK',techniqueId:'5217'});
+}
+function startUltradian(){
+  startFocusCycle({workMin:90,breakMin:20,cyclesUntilLong:999,
+    widgetLabel:'🌊 ULTRADIAN RHYTHM',workLabel:'🌊 FOCUS',breakLabel:'🧘 RECOVER',techniqueId:'ultradian'});
+}
+
+// ── FLOWTIME — open-ended stopwatch, no fixed target ─────────────────
+// Work until you naturally lose focus, then stop and get a break length
+// suggested from how long you actually worked (not a preset number).
+function startFlowtime(){
+  clearInterval(_timerInterval);
+  _timerMode='flowtime';_timerSecs=0;_timerTotal=0;_timerRunning=true;
+  document.getElementById('tw-label').textContent='🌀 FLOWTIME';
+  document.getElementById('timer-widget').classList.add('visible');
+  _timerInterval=setInterval(tickFlowtime,1000);updateTimerUI();
+}
+function tickFlowtime(){
+  if(!_timerRunning)return;
+  _timerSecs++; // counts UP — there is no target to reach
+  updateTimerUI();
+}
+function flowtimeBreakSuggestion(workedMins){
+  if(workedMins<25) return 5;
+  if(workedMins<50) return 8;
+  if(workedMins<90) return 10;
+  return 15;
+}
+
 function tickTimer(){
   if(!_timerRunning)return;_timerSecs--;
   if(_timerSecs<=0){_timerSecs=0;_timerRunning=false;clearInterval(_timerInterval);showToast('⏰ Time is up!');}
@@ -2646,10 +2722,10 @@ function tickPomodoro(){
   if(_timerSecs<=0){
     if(_pomPhase==='work'){
       _pomCount++;const c=parseInt(localStorage.getItem('lt_pomo_count')||'0')+1;localStorage.setItem('lt_pomo_count',c);
-      if(_pomCount%4===0){_pomPhase='long';_timerSecs=PL;_timerTotal=PL;showToast('🎉 4 done! 15 min break.');}
-      else{_pomPhase='short';_timerSecs=PS;_timerTotal=PS;showToast('✅ Pomodoro done! 5 min break.');}
-    }else{_pomPhase='work';_timerSecs=PW;_timerTotal=PW;showToast('🍅 Back to work!');}
-    document.getElementById('tw-label').textContent=_pomPhase==='work'?'🍅 FOCUS':_pomPhase==='long'?'😴 LONG BREAK':'☕ BREAK';
+      if(_pomCount%_pomCyclesUntilLong===0){_pomPhase='long';_timerSecs=_pomLongBreakSecs;_timerTotal=_pomLongBreakSecs;showToast('🎉 Cycle done! Longer break.');}
+      else{_pomPhase='short';_timerSecs=_pomShortBreakSecs;_timerTotal=_pomShortBreakSecs;showToast('✅ Focus block done! Break time.');}
+    }else{_pomPhase='work';_timerSecs=_pomWorkSecs;_timerTotal=_pomWorkSecs;showToast('🎯 Back to focus!');}
+    document.getElementById('tw-label').textContent=_pomPhase==='work'?_pomWorkLabel:_pomPhase==='long'?_pomLongBreakLabel:_pomBreakLabel;
   }
   updateTimerUI();
 }
@@ -2657,22 +2733,55 @@ function updateTimerUI(){
   const m=Math.floor(_timerSecs/60),s=_timerSecs%60;
   const el=document.getElementById('tw-time');if(!el)return;
   el.textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  el.style.color=_timerSecs<=600?'var(--red)':_timerSecs<=1800?'var(--yellow)':'var(--green)';
-  const pct=_timerTotal?(_timerSecs/_timerTotal)*100:0;
-  document.getElementById('tw-fill').style.width=pct+'%';
-  document.getElementById('tw-phase').textContent=_timerMode==='pomodoro'?`${_pomPhase==='work'?'Focus':'Break'} · #${_pomCount+1}`:'';
+  if(_timerMode==='flowtime'){
+    // Counting UP — more elapsed time is good, so no "running low" red state
+    el.style.color='var(--accent)';
+    document.getElementById('tw-fill').style.width='100%';
+    document.getElementById('tw-phase').textContent='Work until you lose focus, then tap ✕';
+  } else {
+    el.style.color=_timerSecs<=600?'var(--red)':_timerSecs<=1800?'var(--yellow)':'var(--green)';
+    const pct=_timerTotal?(_timerSecs/_timerTotal)*100:0;
+    document.getElementById('tw-fill').style.width=pct+'%';
+    document.getElementById('tw-phase').textContent=_timerMode==='pomodoro'?`${_pomPhase==='work'?'Focus':'Break'} · #${_pomCount+1}`:'';
+  }
 }
 function toggleTimer(){
   _timerRunning=!_timerRunning;
-  if(_timerRunning) _timerInterval=setInterval(_timerMode==='pomodoro'?tickPomodoro:tickTimer,1000);
+  const tickFn=_timerMode==='pomodoro'?tickPomodoro:_timerMode==='flowtime'?tickFlowtime:tickTimer;
+  if(_timerRunning) _timerInterval=setInterval(tickFn,1000);
   else clearInterval(_timerInterval);
   document.getElementById('tw-toggle').textContent=_timerRunning?'Pause':'Resume';
 }
 function resetTimer(){
-  clearInterval(_timerInterval);_timerRunning=false;_timerSecs=_timerTotal;updateTimerUI();
+  clearInterval(_timerInterval);_timerRunning=false;
+  _timerSecs=_timerMode==='flowtime'?0:_timerTotal;
+  updateTimerUI();
   document.getElementById('tw-toggle').textContent='Start';
 }
 function closeTimer(){
+  // Flowtime: show a break suggestion based on actual elapsed time before closing
+  if(_timerMode==='flowtime'){
+    const workedMins=Math.round(_timerSecs/60);
+    const breakMins=flowtimeBreakSuggestion(workedMins);
+    clearInterval(_timerInterval);_timerRunning=false;
+    document.getElementById('timer-widget').classList.remove('visible');
+    if(workedMins>=1){
+      showModal(`
+        <div class="modal-title">🌀 Flowtime session complete</div>
+        <div style="text-align:center;padding:14px 0 10px">
+          <div style="font-size:34px;font-weight:800;color:var(--accent)">${workedMins} min</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">of focused work</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;margin-bottom:6px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px">SUGGESTED BREAK</div>
+          <div style="font-size:24px;font-weight:700;color:var(--green)">${breakMins} min</div>
+        </div>
+        <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:10px">Longer flow, longer recovery — that's the whole method.</div>
+        <div class="modal-actions"><button class="btn btn-accent" style="width:100%" onclick="closeModal()">Got it</button></div>
+      `);
+    }
+    return;
+  }
   // If a reading session was active, log it before tearing the widget down
   if(_activeReadingBookId&&_readingTimerRunning){
     _readingTimerRunning=false;
@@ -4687,6 +4796,384 @@ function preCacheQuotes(){
 // Pomodoro, the session timer, Journal, etc. Opening from the header
 // instead means they work identically no matter which tab is active.
 // ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+// FOCUS TECHNIQUES — planning methodologies (non-timer tools)
+// Each persists to localStorage + syncs to Google Sheets via apiMeta,
+// same pattern as habits/books, so it survives across devices.
+// ═══════════════════════════════════════════════════════════════════════
+
+// ── TIME BLOCKING / TIMEBOXING ────────────────────────────────────────
+let _timeBlocks=[];
+function loadTimeBlocks(data){try{_timeBlocks=JSON.parse(data)||[];}catch{_timeBlocks=[];}}
+function saveTimeBlocks(){
+  localStorage.setItem('lt_timeblocks',JSON.stringify(_timeBlocks));
+  apiMeta('timeblocks',JSON.stringify(_timeBlocks)).catch(()=>{});
+}
+function todayBlocks(){
+  const today=new Date().toDateString();
+  return _timeBlocks.filter(b=>b.date===today).sort((a,b)=>a.start.localeCompare(b.start));
+}
+function showTimeBlocking(){
+  const blocks=todayBlocks();
+  showModal(`
+    <div class="modal-title">🗓️ Time Blocking — Today</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Assign every hour a job before the day starts. If it's not on the calendar, it doesn't happen.</div>
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      <input type="time" id="tb-start" class="modal-inp" style="flex:1" value="09:00"/>
+      <input type="time" id="tb-end" class="modal-inp" style="flex:1" value="10:00"/>
+    </div>
+    <input class="modal-inp" id="tb-label" placeholder="What are you doing in this block?"/>
+    <button class="btn btn-accent" style="width:100%;margin-bottom:14px" onclick="addTimeBlock()">+ Add Block</button>
+    <div style="max-height:38vh;overflow-y:auto" id="tb-list">
+      ${blocks.length===0?'<div style="color:var(--text3);text-align:center;padding:20px;font-size:13px">No blocks yet today.</div>':
+      blocks.map(b=>`
+        <div style="display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;${b.done?'opacity:.5':''}">
+          <div style="font-size:11px;color:var(--text2);font-family:monospace;flex-shrink:0">${b.start}–${b.end}</div>
+          <div style="flex:1;font-size:13px;${b.done?'text-decoration:line-through':''}">${esc(b.label)}</div>
+          <button onclick="toggleTimeBlock('${b.id}')" style="background:none;border:none;font-size:16px;cursor:pointer">${b.done?'✅':'⬜'}</button>
+          <button onclick="deleteTimeBlock('${b.id}')" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--text3)">🗑️</button>
+        </div>`).join('')}
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>
+  `);
+}
+function addTimeBlock(){
+  const start=document.getElementById('tb-start')?.value;
+  const end=document.getElementById('tb-end')?.value;
+  const label=document.getElementById('tb-label')?.value.trim();
+  if(!start||!end||!label){showToast('Fill in start, end and a label.');return;}
+  _timeBlocks.push({id:'tb_'+Date.now(),date:new Date().toDateString(),start,end,label,done:false});
+  saveTimeBlocks();showTimeBlocking();
+}
+function toggleTimeBlock(id){
+  const b=_timeBlocks.find(x=>x.id===id);if(!b)return;
+  b.done=!b.done;saveTimeBlocks();showTimeBlocking();
+}
+function deleteTimeBlock(id){
+  _timeBlocks=_timeBlocks.filter(x=>x.id!==id);saveTimeBlocks();showTimeBlocking();
+}
+
+// ── GETTING THINGS DONE (GTD) ──────────────────────────────────────────
+let _gtdItems=[];
+let _gtdFilter='inbox';
+function loadGTD(data){try{_gtdItems=JSON.parse(data)||[];}catch{_gtdItems=[];}}
+function saveGTD(){
+  localStorage.setItem('lt_gtd',JSON.stringify(_gtdItems));
+  apiMeta('gtd',JSON.stringify(_gtdItems)).catch(()=>{});
+}
+const GTD_BUCKETS=[
+  {id:'inbox',icon:'📥',label:'Inbox'},
+  {id:'next',icon:'▶️',label:'Next Action'},
+  {id:'waiting',icon:'⏳',label:'Waiting For'},
+  {id:'someday',icon:'💭',label:'Someday'},
+  {id:'reference',icon:'📚',label:'Reference'},
+  {id:'done',icon:'✅',label:'Done'},
+];
+function showGTD(){
+  const items=_gtdItems.filter(i=>i.bucket===_gtdFilter);
+  showModal(`
+    <div class="modal-title">📥 Getting Things Done</div>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <input class="modal-inp" id="gtd-capture" placeholder="Capture anything on your mind…" style="flex:1;margin-bottom:0" onkeydown="if(event.key==='Enter')captureGTD()"/>
+      <button class="btn btn-accent" onclick="captureGTD()">Add</button>
+    </div>
+    <div class="cat-tabs" style="margin-bottom:12px">
+      ${GTD_BUCKETS.map(b=>`<div class="cat-tab ${_gtdFilter===b.id?'active':''}" onclick="_gtdFilter='${b.id}';showGTD()">${b.icon} ${b.label} (${_gtdItems.filter(i=>i.bucket===b.id).length})</div>`).join('')}
+    </div>
+    <div style="max-height:36vh;overflow-y:auto">
+      ${items.length===0?'<div style="color:var(--text3);text-align:center;padding:20px;font-size:13px">Nothing here.</div>':
+      items.map(i=>`
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px">
+          <div style="font-size:13px;margin-bottom:8px">${esc(i.text)}</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            ${GTD_BUCKETS.filter(b=>b.id!==i.bucket).map(b=>`<button onclick="moveGTD('${i.id}','${b.id}')" style="background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer">${b.icon} ${b.label}</button>`).join('')}
+            <button onclick="deleteGTD('${i.id}')" style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;margin-left:auto">🗑️</button>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>
+  `);
+  setTimeout(()=>document.getElementById('gtd-capture')?.focus(),50);
+}
+function captureGTD(){
+  const text=document.getElementById('gtd-capture')?.value.trim();
+  if(!text)return;
+  _gtdItems.unshift({id:'gtd_'+Date.now(),text,bucket:'inbox',createdAt:new Date().toISOString()});
+  saveGTD();_gtdFilter='inbox';showGTD();
+}
+function moveGTD(id,bucket){
+  const i=_gtdItems.find(x=>x.id===id);if(!i)return;
+  i.bucket=bucket;saveGTD();showGTD();
+}
+function deleteGTD(id){
+  _gtdItems=_gtdItems.filter(x=>x.id!==id);saveGTD();showGTD();
+}
+
+// ── EISENHOWER MATRIX ──────────────────────────────────────────────────
+let _eisenTasks=[];
+function loadEisenhower(data){try{_eisenTasks=JSON.parse(data)||[];}catch{_eisenTasks=[];}}
+function saveEisenhower(){
+  localStorage.setItem('lt_eisenhower',JSON.stringify(_eisenTasks));
+  apiMeta('eisenhower',JSON.stringify(_eisenTasks)).catch(()=>{});
+}
+const EISEN_QUADS=[
+  {id:'do',    urgent:true,  important:true,  icon:'🔥', label:'Do First',   color:'var(--red)'},
+  {id:'sched', urgent:false, important:true,  icon:'📅', label:'Schedule',   color:'var(--accent)'},
+  {id:'deleg', urgent:true,  important:false, icon:'🤝', label:'Delegate',   color:'var(--yellow)'},
+  {id:'elim',  urgent:false, important:false, icon:'🗑️', label:'Eliminate', color:'var(--text3)'},
+];
+function showEisenhower(){
+  const active=_eisenTasks.filter(t=>!t.done);
+  showModal(`
+    <div class="modal-title">🧭 Eisenhower Matrix</div>
+    <input class="modal-inp" id="eisen-text" placeholder="What's the task?"/>
+    <div style="display:flex;gap:14px;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><input type="checkbox" id="eisen-urgent" style="accent-color:var(--accent)"/> Urgent</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><input type="checkbox" id="eisen-important" style="accent-color:var(--accent)"/> Important</label>
+    </div>
+    <button class="btn btn-accent" style="width:100%;margin-bottom:14px" onclick="addEisenhower()">+ Add Task</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:40vh;overflow-y:auto">
+      ${EISEN_QUADS.map(q=>{
+        const tasks=active.filter(t=>t.urgent===q.urgent&&t.important===q.important);
+        return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px">
+          <div style="font-size:11px;font-weight:700;color:${q.color};margin-bottom:6px">${q.icon} ${q.label}</div>
+          ${tasks.length===0?'<div style="font-size:10px;color:var(--text3)">Empty</div>':
+          tasks.map(t=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+            <button onclick="doneEisenhower('${t.id}')" style="background:none;border:none;font-size:12px;cursor:pointer;flex-shrink:0">⬜</button>
+            <span style="font-size:11px;flex:1">${esc(t.text)}</span>
+          </div>`).join('')}
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>
+  `);
+}
+function addEisenhower(){
+  const text=document.getElementById('eisen-text')?.value.trim();
+  if(!text){showToast('Enter a task first.');return;}
+  const urgent=document.getElementById('eisen-urgent')?.checked||false;
+  const important=document.getElementById('eisen-important')?.checked||false;
+  _eisenTasks.push({id:'ei_'+Date.now(),text,urgent,important,done:false});
+  saveEisenhower();showEisenhower();
+}
+function doneEisenhower(id){
+  const t=_eisenTasks.find(x=>x.id===id);if(!t)return;
+  t.done=true;saveEisenhower();showEisenhower();
+}
+
+// ── EAT THE FROG ────────────────────────────────────────────────────────
+function getFrogLog(){try{return JSON.parse(localStorage.getItem('lt_frog_log')||'[]');}catch{return[];}}
+function saveFrogLog(log){
+  localStorage.setItem('lt_frog_log',JSON.stringify(log));
+  apiMeta('frogLog',JSON.stringify(log)).catch(()=>{});
+}
+function loadFrogLog(data){try{localStorage.setItem('lt_frog_log',data);}catch{}}
+function todayFrog(){
+  const log=getFrogLog();
+  return log.find(f=>f.date===new Date().toDateString());
+}
+function frogStreak(){
+  const log=getFrogLog().filter(f=>f.eaten).map(f=>f.date);
+  let streak=0;const d=new Date();d.setHours(0,0,0,0);
+  for(let i=0;i<365;i++){
+    const dk=new Date(d);dk.setDate(d.getDate()-i);
+    if(log.includes(dk.toDateString()))streak++;
+    else if(i===0)continue;
+    else break;
+  }
+  return streak;
+}
+function showEatTheFrog(){
+  const frog=todayFrog();
+  const streak=frogStreak();
+  showModal(`
+    <div class="modal-title">🐸 Eat The Frog</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px">Do your hardest, most important task first — before email, before anything easy. Everything after feels lighter.</div>
+    ${!frog?`
+      <div class="lbl">What's today's frog?</div>
+      <input class="modal-inp" id="frog-text" placeholder="The one thing you're avoiding…"/>
+      <button class="btn btn-accent" style="width:100%" onclick="setTodayFrog()">🐸 Set today's frog</button>
+    `:`
+      <div style="background:${frog.eaten?'rgba(31,204,110,.08)':'rgba(245,166,35,.08)'};border:1px solid ${frog.eaten?'rgba(31,204,110,.2)':'rgba(245,166,35,.2)'};border-radius:10px;padding:16px;text-align:center;margin-bottom:14px">
+        <div style="font-size:32px;margin-bottom:6px">🐸</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:10px">${esc(frog.text)}</div>
+        ${frog.eaten?'<div style="color:var(--green);font-weight:700;font-size:13px">✅ Eaten! Great work.</div>':
+        `<button class="btn btn-accent" onclick="eatFrog()">🍽️ I ate the frog</button>`}
+      </div>
+    `}
+    <div style="display:flex;align-items:center;gap:8px;justify-content:center;font-size:12px;color:var(--text2)">
+      🔥 <strong style="color:var(--yellow)">${streak}</strong> day streak of eating the frog first
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>
+  `);
+}
+function setTodayFrog(){
+  const text=document.getElementById('frog-text')?.value.trim();
+  if(!text){showToast('What\'s your frog today?');return;}
+  const log=getFrogLog();
+  log.push({date:new Date().toDateString(),text,eaten:false});
+  saveFrogLog(log);showEatTheFrog();
+}
+function eatFrog(){
+  const log=getFrogLog();
+  const f=log.find(x=>x.date===new Date().toDateString());
+  if(f){f.eaten=true;saveFrogLog(log);haptic('success');showToast('🐸 Frog eaten! 🎉');showEatTheFrog();}
+}
+
+// ── DON'T BREAK THE CHAIN ────────────────────────────────────────────────
+let _chains=[];
+function loadChains(data){try{_chains=JSON.parse(data)||[];}catch{_chains=[];}}
+function saveChains(){
+  localStorage.setItem('lt_chains',JSON.stringify(_chains));
+  apiMeta('chains',JSON.stringify(_chains)).catch(()=>{});
+}
+function chainStreak(chain){
+  let streak=0;const d=new Date();d.setHours(0,0,0,0);
+  for(let i=0;i<365;i++){
+    const dk=new Date(d);dk.setDate(d.getDate()-i);
+    if((chain.doneDates||[]).includes(dk.toDateString()))streak++;
+    else if(i===0)continue;
+    else break;
+  }
+  return streak;
+}
+function showDontBreakChain(){
+  showModal(`
+    <div class="modal-title">⛓️ Don't Break The Chain</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Jerry Seinfeld's method: pick one thing, do it every single day, never break the visual chain.</div>
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      <input class="modal-inp" id="chain-name" placeholder="e.g. Write code, Meditate, No sugar…" style="flex:1;margin-bottom:0"/>
+      <button class="btn btn-accent" onclick="addChain()">+ Add</button>
+    </div>
+    <div style="max-height:42vh;overflow-y:auto">
+      ${_chains.length===0?'<div style="color:var(--text3);text-align:center;padding:20px;font-size:13px">No chains yet — add one above.</div>':
+      _chains.map(ch=>{
+        const streak=chainStreak(ch);
+        const today=new Date().toDateString();
+        const doneToday=(ch.doneDates||[]).includes(today);
+        // last 70 days grid
+        const cells=[];
+        for(let i=69;i>=0;i--){
+          const d=new Date();d.setDate(d.getDate()-i);
+          const dk=d.toDateString();
+          const done=(ch.doneDates||[]).includes(dk);
+          cells.push(`<div title="${dk}" style="aspect-ratio:1;border-radius:2px;background:${done?'var(--green)':'var(--border)'};${dk===today?'box-shadow:0 0 0 1.5px var(--accent)':''}"></div>`);
+        }
+        return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-size:13px;font-weight:700">${esc(ch.name)}</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;color:var(--yellow);font-weight:700">🔥 ${streak}</span>
+              <button onclick="toggleChainToday('${ch.id}')" style="background:${doneToday?'var(--green)':'var(--surface)'};border:1px solid ${doneToday?'var(--green)':'var(--border2)'};color:${doneToday?'#000':'var(--text2)'};border-radius:7px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer">${doneToday?'✓ Done':'Mark today'}</button>
+              <button onclick="deleteChain('${ch.id}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px">🗑️</button>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(14,1fr);gap:2px">${cells.join('')}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>
+  `);
+}
+function addChain(){
+  const name=document.getElementById('chain-name')?.value.trim();
+  if(!name){showToast('Name your chain first.');return;}
+  _chains.push({id:'ch_'+Date.now(),name,doneDates:[]});
+  saveChains();showDontBreakChain();
+}
+function toggleChainToday(id){
+  const ch=_chains.find(x=>x.id===id);if(!ch)return;
+  const today=new Date().toDateString();
+  if(!ch.doneDates)ch.doneDates=[];
+  const idx=ch.doneDates.indexOf(today);
+  if(idx>=0){ch.doneDates.splice(idx,1);}
+  else{ch.doneDates.push(today);haptic('success');}
+  saveChains();showDontBreakChain();
+}
+function deleteChain(id){
+  if(!confirm('Delete this chain and its history?'))return;
+  _chains=_chains.filter(x=>x.id!==id);saveChains();showDontBreakChain();
+}
+
+// ── TASK LIST — define tasks, strikethrough to complete ────────────────
+let _tasks=[];
+function loadTasks(data){try{_tasks=JSON.parse(data)||[];}catch{_tasks=[];}}
+function saveTasks(){
+  localStorage.setItem('lt_tasks',JSON.stringify(_tasks));
+  apiMeta('tasks',JSON.stringify(_tasks)).catch(()=>{});
+}
+function showTaskList(){
+  const active=_tasks.filter(t=>!t.done);
+  const done=_tasks.filter(t=>t.done);
+  showModal(`
+    <div class="modal-title">✅ Tasks <span style="font-size:12px;font-weight:400;color:var(--text2)">${active.length} left</span></div>
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      <input class="modal-inp" id="task-text" placeholder="What needs doing?" style="flex:1;margin-bottom:0" onkeydown="if(event.key==='Enter')addTask()"/>
+      <button class="btn btn-accent" onclick="addTask()">Add</button>
+    </div>
+    <div style="max-height:44vh;overflow-y:auto">
+      ${_tasks.length===0?'<div style="color:var(--text3);text-align:center;padding:24px;font-size:13px">No tasks yet.</div>':
+      [...active,...done].map(t=>`
+        <div style="display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;${t.done?'opacity:.55':''}">
+          <button onclick="toggleTask('${t.id}')" style="background:none;border:none;font-size:16px;cursor:pointer;flex-shrink:0">${t.done?'✅':'⬜'}</button>
+          <div onclick="toggleTask('${t.id}')" style="flex:1;font-size:13px;cursor:pointer;${t.done?'text-decoration:line-through;color:var(--text3)':''}">${esc(t.text)}</div>
+          <button onclick="deleteTask('${t.id}')" style="background:none;border:none;color:var(--text3);font-size:13px;cursor:pointer;flex-shrink:0">🗑️</button>
+        </div>`).join('')}
+    </div>
+    ${done.length>0?`<button onclick="clearDoneTasks()" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;margin-top:6px;text-decoration:underline">Clear ${done.length} completed</button>`:''}
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>
+  `);
+  setTimeout(()=>document.getElementById('task-text')?.focus(),50);
+}
+function addTask(){
+  const text=document.getElementById('task-text')?.value.trim();
+  if(!text)return;
+  _tasks.unshift({id:'tk_'+Date.now(),text,done:false,createdAt:new Date().toISOString()});
+  saveTasks();showTaskList();
+}
+function toggleTask(id){
+  const t=_tasks.find(x=>x.id===id);if(!t)return;
+  t.done=!t.done;
+  if(t.done)haptic('success');
+  saveTasks();showTaskList();
+}
+function deleteTask(id){
+  _tasks=_tasks.filter(x=>x.id!==id);saveTasks();showTaskList();
+}
+function clearDoneTasks(){
+  _tasks=_tasks.filter(t=>!t.done);saveTasks();showTaskList();
+}
+
+// ── TECHNIQUES MENU — picker for all 9 requested techniques ───────────
+function showTechniquesMenu(){
+  const techniques=[
+    {icon:'🌀',name:'Flowtime',desc:'Work until you lose focus, then take a break sized to match',fn:'startFlowtime()'},
+    {icon:'🎬',name:'Animedoro',desc:'25 min focus, 23 min anime-episode break',fn:'startAnimedoro()'},
+    {icon:'🗓️',name:'Time Blocking',desc:'Assign every task a slot on today\\'s clock',fn:'showTimeBlocking()'},
+    {icon:'⚡',name:'52/17 Rule',desc:'52 min focus, 17 min break — the most productive ratio DeskTime found',fn:'start5217()'},
+    {icon:'🌊',name:'Ultradian Rhythm',desc:'90 min focus, 20 min recovery — matches your body\\'s natural energy cycle',fn:'startUltradian()'},
+    {icon:'📥',name:'Getting Things Done',desc:'Capture everything, organize into buckets, never lose a task',fn:'showGTD()'},
+    {icon:'🧭',name:'Eisenhower Matrix',desc:'Sort by urgent vs important — do, schedule, delegate, or eliminate',fn:'showEisenhower()'},
+    {icon:'🐸',name:'Eat The Frog',desc:'Do your hardest task first, before anything else',fn:'showEatTheFrog()'},
+    {icon:'⛓️',name:"Don't Break the Chain",desc:'Seinfeld\\'s method — one habit, marked every single day',fn:'showDontBreakChain()'},
+  ];
+  showModal(`
+    <div class="modal-title">⏳ Focus Techniques</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Pick whichever fits what you're about to work on.</div>
+    <div style="max-height:56vh;overflow-y:auto">
+      ${techniques.map(t=>`
+        <div onclick="closeModal();${t.fn}" style="display:flex;align-items:flex-start;gap:12px;padding:11px 4px;border-bottom:1px solid var(--border);cursor:pointer">
+          <div style="font-size:22px;flex-shrink:0">${t.icon}</div>
+          <div>
+            <div style="font-size:13px;font-weight:700">${t.name}</div>
+            <div style="font-size:11px;color:var(--text2);line-height:1.5">${t.desc}</div>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>
+  `);
+}
+
 function showToolsMenu(){
   const freezes = getStreakFreezes();
   const tool = (icon,label,fn,color) => `
@@ -4708,6 +5195,7 @@ function showToolsMenu(){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
       ${tool('🍅','Pomodoro',"startPomodoro()",c.red)}
       ${tool('⏱️','2h Timer',"startTimer(120)",c.green)}
+      ${tool('✅','Tasks',"showTaskList()",c.green)}
       ${tool('📝','Notes',"showNotesLib()",c.neutral)}
       ${tool('📊','Summary',"showWeeklySummary()",c.neutral)}
       ${tool('📔','Journal',"showJournal()",c.purple)}
@@ -4718,6 +5206,7 @@ function showToolsMenu(){
       ${tool('🔁','Reviews',"showDueReviews()",c.neutral)}
       ${tool('🔍','Search',"openCommandPalette()",c.neutral)}
       ${tool('⌨️','Shortcuts',"showKeyboardShortcuts()",c.neutral)}
+      ${tool('⏳','Techniques',"showTechniquesMenu()",{bg:'rgba(245,166,35,.1)',border:'rgba(245,166,35,.25)',text:'var(--yellow)'})}
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>
   `);
