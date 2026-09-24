@@ -2799,6 +2799,12 @@ function updateNotifBell(){
 }
 
 window.onload=async()=>{
+  // login-screen defaults to visible (display:flex in its base CSS) and
+  // sits at a higher z-index than the loading overlay, so it must be
+  // hidden explicitly here — otherwise it stays on top for the entire
+  // async session-check/handoff duration, which is what was showing a
+  // ~2s flash of the login form before the app actually appeared.
+  document.getElementById('login-screen').style.display='none';
   document.getElementById('loading').style.display='flex';
   setLoadingMsg('🔐 Checking session…');
 
@@ -2851,6 +2857,7 @@ window.onload=async()=>{
     sessionToken=null;clearSession();
   }
   document.getElementById('loading').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
   document.getElementById('login-token').focus();
   startLockoutCountdown();
 };
