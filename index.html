@@ -579,8 +579,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 // To re-generate these blobs (e.g. if you change the URL or token):
 //   Run the encrypt-credentials.html tool and paste the new values here.
 // ═══════════════════════════════════════════════════════════════════════
-const ENC_URL       = 'Uk/SJMQFnWyQt5ykBOm9REYfO3S/FxnenJNHnjX2gWR59XKL8o4chhO1T7dATKkPByzDNL7QkCsUMloS33aMdoQWZKWfGpMzmBu8/CBmy03ExT3/0xJt8697yFeyRqiI7owA4wp5vO0ddSjkW4xMFKG2/ImiYilU24MDQ647Ma8w3cwZBssXPp5pbdg=';
-const ENC_EMAIL     = 'AqGz5W8eMOsR6anaRemcTGJAN6HijUfQt12k2CzzGOA5k3mb9Jmv1Eb8nEc8/Z5uKgAl';
+const ENC_URL = 'Uk/SJMQFnWyQt5ykBOm9REYfO3S/FxnenJNHnjX2gWR59XKL8o4chhO1T7dATKkPByzDNL7QkCsUMloS33aMdoQWZKWfGpMzmBu8/CBmy03ExT3/0xJt8697yFeyRqiI7owA4wp5vO0ddSjkW4xMFKG2/ImiYilU24MDQ647Ma8w3cwZBssXPp5pbdg=';
+const ENC_EMAIL = 'AqGz5W8eMOsR6anaRemcTGJAN6HijUfQt12k2CzzGOA5k3mb9Jmv1Eb8nEc8/Z5uKgAl';
 const ENC_SERVERKEY = 'vOLIF4vrC1GDhNrlRoNidSUWpsmynD09sltRoxQCcU0Ws6PjyciIGa8kgvE=';
 const SESSION_KEY = 'lt_habit_v1';
 
@@ -5149,13 +5149,13 @@ function showTechniquesMenu(){
   const techniques=[
     {icon:'🌀',name:'Flowtime',desc:'Work until you lose focus, then take a break sized to match',fn:'startFlowtime()'},
     {icon:'🎬',name:'Animedoro',desc:'25 min focus, 23 min anime-episode break',fn:'startAnimedoro()'},
-    {icon:'🗓️',name:'Time Blocking',desc:'Assign every task a slot on today\\'s clock',fn:'showTimeBlocking()'},
+    {icon:'🗓️',name:'Time Blocking',desc:"Assign every task a slot on today's clock",fn:'showTimeBlocking()'},
     {icon:'⚡',name:'52/17 Rule',desc:'52 min focus, 17 min break — the most productive ratio DeskTime found',fn:'start5217()'},
-    {icon:'🌊',name:'Ultradian Rhythm',desc:'90 min focus, 20 min recovery — matches your body\\'s natural energy cycle',fn:'startUltradian()'},
+    {icon:'🌊',name:'Ultradian Rhythm',desc:"90 min focus, 20 min recovery — matches your body's natural energy cycle",fn:'startUltradian()'},
     {icon:'📥',name:'Getting Things Done',desc:'Capture everything, organize into buckets, never lose a task',fn:'showGTD()'},
     {icon:'🧭',name:'Eisenhower Matrix',desc:'Sort by urgent vs important — do, schedule, delegate, or eliminate',fn:'showEisenhower()'},
     {icon:'🐸',name:'Eat The Frog',desc:'Do your hardest task first, before anything else',fn:'showEatTheFrog()'},
-    {icon:'⛓️',name:"Don't Break the Chain",desc:'Seinfeld\\'s method — one habit, marked every single day',fn:'showDontBreakChain()'},
+    {icon:'⛓️',name:"Don't Break the Chain",desc:"Seinfeld's method — one habit, marked every single day",fn:'showDontBreakChain()'},
   ];
   showModal(`
     <div class="modal-title">⏳ Focus Techniques</div>
