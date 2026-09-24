@@ -21,8 +21,12 @@
 
 <!-- Clickjacking protection -->
 <script>
-  if (window.top !== window.self) {
-    window.top.location = window.self.location;
+  try {
+    if (window.top !== window.self) {
+      window.top.location = window.self.location;
+    }
+  } catch (e) {
+    // See index.html for the full explanation of why this is caught.
   }
 </script>
 <style>

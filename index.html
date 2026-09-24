@@ -51,8 +51,16 @@
      by forcing the browser to navigate the top-level window to the real
      page instead of silently rendering inside someone else's site. -->
 <script>
-  if (window.top !== window.self) {
-    window.top.location = window.self.location;
+  try {
+    if (window.top !== window.self) {
+      window.top.location = window.self.location;
+    }
+  } catch (e) {
+    // Browsers block this navigation for sandboxed/opaque-origin frames
+    // (e.g. srcdoc-based preview tools) — that's the browser's own
+    // sandboxing already containing the frame, so there's nothing more
+    // to do here. Swallow it rather than letting an uncaught error stop
+    // every other script on the page from running.
   }
 </script>
 <style>
@@ -515,7 +523,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
     <button class="nav-item" id="nav-dashboard" onclick="switchView('dashboard')">
       <div class="nav-item-icon">📊</div>Progress
     </button>
-    <a class="nav-item" href="habits.html" style="text-decoration:none">
+    <a class="nav-item" href="habits.html" style="text-decoration:none" onclick="return handoffTo('habits.html', event)">
       <div class="nav-item-icon">✅</div>Habits
     </a>
     <button class="nav-item" id="nav-plans" onclick="switchView('plans')">
@@ -570,9 +578,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 // To re-generate these blobs (e.g. if you change the URL or token):
 //   Run the encrypt-credentials.html tool and paste the new values here.
 // ═══════════════════════════════════════════════════════════════════════
-  const ENC_URL = 'Uk/SJMQFnWyQt5ykBOm9REYfO3S/FxnenJNHnjX2gWR59XKL8o4chhO1T7dATKkPByzDNL7QkCsUMloS33aMdoQWZKWfGpMzmBu8/CBmy03ExT3/0xJt8697yFeyRqiI7owA4wp5vO0ddSjkW4xMFKG2/ImiYilU24MDQ647Ma8w3cwZBssXPp5pbdg=';
-  const ENC_EMAIL = 'AqGz5W8eMOsR6anaRemcTGJAN6HijUfQt12k2CzzGOA5k3mb9Jmv1Eb8nEc8/Z5uKgAl';
-  const ENC_SERVERKEY = 'vOLIF4vrC1GDhNrlRoNidSUWpsmynD09sltRoxQCcU0Ws6PjyciIGa8kgvE=';
+const ENC_URL = 'Uk/SJMQFnWyQt5ykBOm9REYfO3S/FxnenJNHnjX2gWR59XKL8o4chhO1T7dATKkPByzDNL7QkCsUMloS33aMdoQWZKWfGpMzmBu8/CBmy03ExT3/0xJt8697yFeyRqiI7owA4wp5vO0ddSjkW4xMFKG2/ImiYilU24MDQ647Ma8w3cwZBssXPp5pbdg=';
+const ENC_EMAIL = 'AqGz5W8eMOsR6anaRemcTGJAN6HijUfQt12k2CzzGOA5k3mb9Jmv1Eb8nEc8/Z5uKgAl';
+const ENC_SERVERKEY = 'vOLIF4vrC1GDhNrlRoNidSUWpsmynD09sltRoxQCcU0Ws6PjyciIGa8kgvE=';
 const SESSION_KEY = 'lt_habit_v1';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1161,6 +1169,50 @@ async function touchSession(){
   if(s) await saveSession(s.token);
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// CROSS-PAGE SESSION HANDOFF
+// ─────────────────────────────────────────────────────────────────────
+// The root problem this fixes: index.html and habits.html are two
+// separate static pages, so clicking between them is a full page reload.
+// The destination page then has to re-derive its session from IndexedDB
+// + localStorage asynchronously before it can render the app — that
+// async round trip is what occasionally races or fails, showing a login
+// screen even though you're already logged in.
+//
+// The fix: while the app is actively running (token already sitting in
+// memory), hand it off directly through the navigation itself via a URL
+// hash fragment. The destination page checks the hash FIRST, before
+// touching any storage at all — so this specific transition never
+// depends on IndexedDB timing. Storage is still used as the fallback for
+// a genuinely fresh open (closed browser, bookmark, etc).
+//
+// Hash fragments are never sent over the network (browsers strip
+// everything after # before making the HTTP request), so this never
+// touches Apps Script, GitHub Pages, or any server — it's a purely
+// client-side, same-origin, same-tab handoff.
+// ═══════════════════════════════════════════════════════════════════════
+function handoffTo(url, event){
+  if(event) event.preventDefault();
+  if(sessionToken){
+    location.href = url + '#t=' + encodeURIComponent(sessionToken);
+  } else {
+    location.href = url; // not logged in — destination page's normal login flow applies
+  }
+  return false;
+}
+
+// Checks for a handoff token in the URL hash. Returns the token string if
+// found (and immediately scrubs it from the visible URL), or null.
+function consumeHandoffToken(){
+  const m = location.hash.match(/^#t=(.+)$/);
+  if(!m) return null;
+  const token = decodeURIComponent(m[1]);
+  // Strip it from the address bar right away — it should never linger
+  // in the URL bar or in visible browser history.
+  history.replaceState(null, '', location.pathname + location.search);
+  return token;
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════
 // DATA VERSIONING & MIGRATION
@@ -1480,9 +1532,11 @@ async function doLogin(){
       if(remember) await saveSession(token);
       // If the user was bounced here from habits.html to log in, send them
       // straight back there — one login screen serves the whole app.
+      // Hand off the token directly rather than relying on the stored
+      // session, so habits.html doesn't need any async storage roundtrip.
       const goto = new URLSearchParams(location.search).get('goto');
       if(goto === 'habits'){
-        location.href = 'habits.html';
+        handoffTo('habits.html');
         return;
       }
       // Brief pause so user sees the success message before the app opens
@@ -2745,10 +2799,34 @@ function updateNotifBell(){
 }
 
 window.onload=async()=>{
+  document.getElementById('loading').style.display='flex';
+  setLoadingMsg('🔐 Checking session…');
+
+  // ── PATH 1: direct handoff from habits.html (fast, no storage lookup) ──
+  const handoffToken = consumeHandoffToken();
+  if(handoffToken){
+    const ok = await decryptCredentials(handoffToken);
+    if(ok){
+      sessionToken = handoffToken;
+      setLoadingMsg('🌐 Syncing your progress…');
+      try{
+        const res = await apiGet();
+        if(res.success){
+          loadSheet(res.data||[]);
+          setLoadingMsg('✅ Ready!');
+          // Keep the persistent session fresh too, so a later cold open still works
+          saveSession(handoffToken).catch(()=>{});
+          setTimeout(()=>{ document.getElementById('loading').style.display='none'; showApp(); },150);
+          return;
+        }
+      }catch(e){}
+    }
+    // Handoff token was somehow invalid — fall through to normal flow below
+  }
+
+  // ── PATH 2: stored session (cold open — closed browser, bookmark, etc) ──
   const sess=await getSession();
   if(sess?.token){
-    // Show loading screen immediately so user sees feedback
-    document.getElementById('loading').style.display='flex';
     setLoadingMsg('🔐 Decrypting credentials…');
 
     const ok=await decryptCredentials(sess.token);
@@ -2761,7 +2839,7 @@ window.onload=async()=>{
           loadSheet(res.data||[]);
           setLoadingMsg('✅ Ready!');
           const goto = new URLSearchParams(location.search).get('goto');
-          if(goto === 'habits'){ location.href = 'habits.html'; return; }
+          if(goto === 'habits'){ handoffTo('habits.html'); return; }
           setTimeout(()=>{
             document.getElementById('loading').style.display='none';
             showApp();
@@ -2770,9 +2848,9 @@ window.onload=async()=>{
         }
       }catch(e){}
     }
-    document.getElementById('loading').style.display='none';
     sessionToken=null;clearSession();
   }
+  document.getElementById('loading').style.display='none';
   document.getElementById('login-token').focus();
   startLockoutCountdown();
 };

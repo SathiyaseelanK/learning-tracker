@@ -29,8 +29,12 @@
 
 <!-- Clickjacking protection — see index.html for full explanation -->
 <script>
-  if (window.top !== window.self) {
-    window.top.location = window.self.location;
+  try {
+    if (window.top !== window.self) {
+      window.top.location = window.self.location;
+    }
+  } catch (e) {
+    // See index.html for the full explanation of why this is caught.
   }
 </script>
 <style>
@@ -241,7 +245,7 @@ body.light{--bg:#f0f2f8;--surface:#fff;--surface2:#f5f7fc;--border:#dde2f0;--bor
 <!-- APP -->
 <div id="app">
   <div class="topbar">
-    <a href="index.html" class="topbar-back">← Learning</a>
+    <a href="index.html" class="topbar-back" onclick="return handoffTo('index.html', event)">← Learning</a>
     <div class="topbar-title">✅ My Habits</div>
     <div class="topbar-right">
       <div class="sync-dot" id="sync-dot"></div>
@@ -506,6 +510,23 @@ async function touchSession(){
   if(s) await saveSession(s.token);
 }
 
+// ── CROSS-PAGE SESSION HANDOFF — see index.html for full explanation ───
+function handoffTo(url, event){
+  if(event) event.preventDefault();
+  if(sessionToken){
+    location.href = url + '#t=' + encodeURIComponent(sessionToken);
+  } else {
+    location.href = url;
+  }
+  return false;
+}
+function consumeHandoffToken(){
+  const m = location.hash.match(/^#t=(.+)$/);
+  if(!m) return null;
+  const token = decodeURIComponent(m[1]);
+  history.replaceState(null, '', location.pathname + location.search);
+  return token;
+}
 
 // ── API ──────────────────────────────────────────────────────────────
 async function apiGet(){
@@ -1303,9 +1324,33 @@ window.onload=async()=>{
   const localData=localStorage.getItem('lt_habits_v1');
   if(localData){try{_habits=JSON.parse(localData);}catch{}}
 
+  document.getElementById('loading').style.display='flex';
+  setLoadMsg('🔐 Checking session…');
+
+  // ── PATH 1: direct handoff from index.html (fast, no storage lookup) ──
+  const handoffToken = consumeHandoffToken();
+  if(handoffToken){
+    const ok = await decryptCredentials(handoffToken);
+    if(ok){
+      sessionToken = handoffToken;
+      setLoadMsg('🌐 Syncing your habits…');
+      try{
+        const res = await apiGet();
+        if(res.success){
+          loadSheet(res.data||[]);
+          setLoadMsg('✅ Ready!');
+          saveSession(handoffToken).catch(()=>{});
+          setTimeout(()=>{ document.getElementById('loading').style.display='none'; showApp(); },150);
+          return;
+        }
+      }catch(e){}
+    }
+    // Invalid handoff token — fall through to normal flow below
+  }
+
+  // ── PATH 2: stored session (cold open) ──
   const sess=await getSession();
   if(sess?.token){
-    document.getElementById('loading').style.display='flex';
     setLoadMsg('🔐 Decrypting credentials…');
     const ok=await decryptCredentials(sess.token);
     if(ok){
@@ -1326,9 +1371,10 @@ window.onload=async()=>{
     sessionToken=null;clearSession();
     document.getElementById('loading').style.display='none';
   }
-  // No valid session — send to the one shared login screen instead of
-  // showing a second, separate login form here. After logging in there,
-  // index.html sends you straight back to this page automatically.
+  // No valid session anywhere — send to the one shared login screen
+  // instead of showing a second, separate login form here. After
+  // logging in there, index.html sends you straight back to this page.
+  document.getElementById('loading').style.display='none';
   location.href = 'index.html?goto=habits';
 };
 
