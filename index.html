@@ -496,6 +496,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
     <div class="topbar-logo"><span>🌱 Daily Habit</span></div>
     <div class="topbar-right">
       <div class="streak-pill" id="streak-pill">0🔥</div>
+      <button id="tools-menu-btn" onclick="showToolsMenu()" aria-label="Tools" title="Tools — Pomodoro, Timer, Notes, Journal & more" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 9px;cursor:pointer;font-size:14px">🛠️</button>
       <a href="docs.html" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 9px;font-size:12px;color:var(--text2);text-decoration:none;cursor:pointer" title="Documentation">📚 Docs</a>
       <button id="notif-bell" onclick="showNotificationSettings()" aria-label="Notification settings" title="Reminders" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 9px;cursor:pointer;font-size:14px;position:relative">🔔<span id="notif-dot" style="display:none;position:absolute;top:4px;right:4px;width:7px;height:7px;background:var(--green);border-radius:50%;border:1.5px solid var(--bg)"></span></button>
       <button class="theme-btn" onclick="toggleTheme()" id="theme-btn" aria-label="Toggle dark or light theme" title="Toggle theme">☀️</button>
@@ -4678,6 +4679,50 @@ function preCacheQuotes(){
 // ═══════════════════════════════════════════════════════════════════════
 // UPDATED KEYBOARD SHORTCUTS POPUP
 // ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+// GLOBAL TOOLS MENU — accessible from the header on every view
+// ─────────────────────────────────────────────────────────────────────
+// These tools used to live only inside the Today view's tools row, so
+// switching to Dashboard/Plans/Books/Quotes meant losing access to
+// Pomodoro, the session timer, Journal, etc. Opening from the header
+// instead means they work identically no matter which tab is active.
+// ═══════════════════════════════════════════════════════════════════════
+function showToolsMenu(){
+  const freezes = getStreakFreezes();
+  const tool = (icon,label,fn,color) => `
+    <button onclick="closeModal();${fn}" style="background:${color.bg};border:1px solid ${color.border};color:${color.text};border-radius:10px;padding:12px 10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center">
+      <span style="font-size:20px">${icon}</span>
+      <span>${label}</span>
+    </button>`;
+
+  const c = {
+    red    :{bg:'rgba(240,78,78,.12)', border:'rgba(240,78,78,.25)', text:'var(--red)'},
+    green  :{bg:'rgba(31,204,110,.1)', border:'rgba(31,204,110,.25)',text:'var(--green)'},
+    neutral:{bg:'var(--surface2)',     border:'var(--border)',       text:'var(--text2)'},
+    purple :{bg:'rgba(168,85,247,.1)', border:'rgba(168,85,247,.25)',text:'var(--purple)'},
+    accent :{bg:'rgba(61,127,255,.1)', border:'rgba(61,127,255,.25)',text:'var(--accent)'},
+  };
+
+  showModal(`
+    <div class="modal-title">🛠️ Tools</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+      ${tool('🍅','Pomodoro',"startPomodoro()",c.red)}
+      ${tool('⏱️','2h Timer',"startTimer(120)",c.green)}
+      ${tool('📝','Notes',"showNotesLib()",c.neutral)}
+      ${tool('📊','Summary',"showWeeklySummary()",c.neutral)}
+      ${tool('📔','Journal',"showJournal()",c.purple)}
+      ${tool('🧊',`Freeze (${freezes})`,"showStreakFreezeInfo()",c.accent)}
+      ${tool('🎯','Focus',"toggleFocusMode()",c.neutral)}
+      ${tool('🔖','Bookmarks',"showBookmarks()",c.neutral)}
+      ${tool('📊','Monthly',"showMonthlyReport()",c.neutral)}
+      ${tool('🔁','Reviews',"showDueReviews()",c.neutral)}
+      ${tool('🔍','Search',"openCommandPalette()",c.neutral)}
+      ${tool('⌨️','Shortcuts',"showKeyboardShortcuts()",c.neutral)}
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>
+  `);
+}
+
 function showKeyboardShortcuts(){
   showModal(`
     <div class="modal-title">⌨️ Keyboard Shortcuts</div>
