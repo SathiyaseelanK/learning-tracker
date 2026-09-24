@@ -1,0 +1,20 @@
+{
+  "name": "Daily Learning Habit Tracker",
+  "short_name": "Learning",
+  "description": "Daily learning, habits, books and reflection tracker",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b0e1a",
+  "theme_color": "#3d7fff",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Habits", "url": "./habits.html", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Docs", "url": "./docs.html", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
+  ]
+}

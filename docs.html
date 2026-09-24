@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Learning Habit Tracker — Docs</title>
+<style>
+:root{
+  --bg:#0b0e1a;--surface:#131729;--surface2:#1c2138;--border:#252d4a;--border2:#2e3a5c;
+  --accent:#3d7fff;--accent2:#6c4ff6;--green:#1fcc6e;--yellow:#f5a623;--red:#f04e4e;--purple:#a855f7;
+  --text:#dce3f5;--text2:#7b87b0;--text3:#404870;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.6}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+/* LAYOUT */
+.shell{display:flex;min-height:100vh}
+.sidebar{width:260px;background:var(--surface);border-right:1px solid var(--border);padding:24px 0;position:fixed;top:0;left:0;bottom:0;overflow-y:auto;flex-shrink:0}
+.main{margin-left:260px;padding:40px 48px;max-width:900px}
+@media(max-width:768px){.sidebar{display:none}.main{margin-left:0;padding:24px 20px}}
+/* SIDEBAR */
+.sb-logo{padding:0 20px 20px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.sb-logo-title{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+.sb-logo-title span{background:linear-gradient(120deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sb-logo-sub{font-size:11px;color:var(--text3);margin-top:3px}
+.sb-section{padding:0 12px;margin-bottom:4px}
+.sb-section-title{font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:8px 8px 4px}
+.sb-link{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:7px;font-size:13px;color:var(--text2);cursor:pointer;transition:all .15s;text-decoration:none}
+.sb-link:hover{background:var(--surface2);color:var(--text)}
+.sb-link.active{background:rgba(61,127,255,.12);color:var(--accent);font-weight:600}
+.sb-link-icon{font-size:15px;flex-shrink:0;width:20px;text-align:center}
+/* CONTENT */
+.section{display:none;padding-bottom:60px}
+.section.active{display:block}
+h1{font-size:28px;font-weight:800;margin-bottom:8px;line-height:1.2}
+h2{font-size:20px;font-weight:700;margin:32px 0 12px;padding-top:20px;border-top:1px solid var(--border)}
+h3{font-size:15px;font-weight:700;margin:20px 0 8px;color:var(--accent)}
+p{color:var(--text2);margin-bottom:12px;line-height:1.7}
+.hero-badge{display:inline-block;background:rgba(61,127,255,.12);color:var(--accent);border:1px solid rgba(61,127,255,.25);border-radius:99px;padding:3px 12px;font-size:11px;font-weight:600;margin-bottom:16px}
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin:16px 0}
+.feat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px}
+.feat-card-icon{font-size:24px;margin-bottom:6px}
+.feat-card-title{font-size:13px;font-weight:700;margin-bottom:3px}
+.feat-card-desc{font-size:11px;color:var(--text2);line-height:1.5}
+/* TABLE */
+table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13px}
+th{background:var(--surface2);padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text2);border:1px solid var(--border)}
+td{padding:9px 12px;border:1px solid var(--border);color:var(--text2);vertical-align:top}
+tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+/* STEP */
+.step{display:flex;gap:14px;margin-bottom:16px;align-items:flex-start}
+.step-num{width:28px;height:28px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:1px}
+.step-body{flex:1}
+.step-title{font-size:14px;font-weight:600;margin-bottom:3px}
+.step-desc{font-size:13px;color:var(--text2);line-height:1.6}
+/* CODE */
+code{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-size:12px;font-family:'JetBrains Mono','Fira Code',monospace;color:var(--green)}
+pre{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;overflow-x:auto;margin:12px 0}
+pre code{background:none;border:none;padding:0;font-size:12px;color:var(--text2)}
+/* CALLOUT */
+.callout{border-radius:10px;padding:14px 16px;margin:16px 0;font-size:13px;line-height:1.7}
+.callout-info{background:rgba(61,127,255,.08);border:1px solid rgba(61,127,255,.2);color:var(--text2)}
+.callout-info::before{content:'ℹ️  ';font-style:normal}
+.callout-tip{background:rgba(31,204,110,.08);border:1px solid rgba(31,204,110,.2);color:var(--text2)}
+.callout-tip::before{content:'💡  ';font-style:normal}
+.callout-warn{background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.2);color:var(--text2)}
+.callout-warn::before{content:'⚠️  ';font-style:normal}
+/* KEY */
+kbd{background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:2px 8px;font-size:11px;font-weight:700;font-family:monospace}
+/* BADGE */
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600}
+.badge-green{background:rgba(31,204,110,.12);color:var(--green)}
+.badge-blue{background:rgba(61,127,255,.12);color:var(--accent)}
+.badge-yellow{background:rgba(245,166,35,.12);color:var(--yellow)}
+.badge-purple{background:rgba(168,85,247,.12);color:var(--purple)}
+/* BACK BUTTON */
+.back-btn{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--text2);cursor:pointer;margin-bottom:24px;transition:all .15s}
+.back-btn:hover{border-color:var(--accent);color:var(--accent)}
+/* MOBILE NAV */
+.mobile-top-nav{display:none;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 20px;position:sticky;top:0;z-index:10;align-items:center;justify-content:space-between}
+.mobile-menu-btn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:14px}
+@media(max-width:768px){.mobile-top-nav{display:flex}}
+.mobile-drawer{display:none;position:fixed;inset:0;background:var(--bg);z-index:100;overflow-y:auto;padding:20px}
+.mobile-drawer.open{display:block}
+/* SEARCH */
+.search-bar{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:10px;margin-bottom:28px}
+.search-bar input{background:none;border:none;color:var(--text);font-size:14px;outline:none;flex:1}
+.search-bar input::placeholder{color:var(--text3)}
+/* XP TABLE */
+.xp-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.xp-icon{font-size:20px;width:32px;flex-shrink:0}
+.xp-label{flex:1;font-size:13px;color:var(--text2)}
+.xp-val{font-size:13px;font-weight:700;color:var(--accent)}
+/* LEVEL TABLE */
+.level-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.level-icon{font-size:22px;width:36px}
+.level-name{flex:1;font-size:13px;font-weight:600}
+.level-xp{font-size:12px;color:var(--text3)}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="sidebar">
+  <div class="sb-logo">
+    <div class="sb-logo-title"><span>🌱 Learning Habit</span></div>
+    <div class="sb-logo-sub">Documentation & Help</div>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-section-title">Getting Started</div>
+    <a class="sb-link active" onclick="show('overview')"><span class="sb-link-icon">🏠</span>Overview</a>
+    <a class="sb-link" onclick="show('setup')"><span class="sb-link-icon">⚙️</span>Setup & Login</a>
+    <a class="sb-link" onclick="show('structure')"><span class="sb-link-icon">📁</span>File Structure</a>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-section-title">Features</div>
+    <a class="sb-link" onclick="show('today')"><span class="sb-link-icon">📅</span>Today View</a>
+    <a class="sb-link" onclick="show('dashboard')"><span class="sb-link-icon">📊</span>Dashboard</a>
+    <a class="sb-link" onclick="show('habits')"><span class="sb-link-icon">✅</span>Habits Tracker</a>
+    <a class="sb-link" onclick="show('plans')"><span class="sb-link-icon">🎓</span>Learning Plans</a>
+    <a class="sb-link" onclick="show('books')"><span class="sb-link-icon">📖</span>Books & Reading</a>
+    <a class="sb-link" onclick="show('quotes')"><span class="sb-link-icon">💭</span>Quotes</a>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-section-title">Tools</div>
+    <a class="sb-link" onclick="show('timers')"><span class="sb-link-icon">⏱️</span>Pomodoro & Timers</a>
+    <a class="sb-link" onclick="show('gamification')"><span class="sb-link-icon">⭐</span>XP, Levels & Achievements</a>
+    <a class="sb-link" onclick="show('journal')"><span class="sb-link-icon">📔</span>Journal & Reflection</a>
+    <a class="sb-link" onclick="show('focus')"><span class="sb-link-icon">🎯</span>Focus Mode</a>
+    <a class="sb-link" onclick="show('freeze')"><span class="sb-link-icon">🧊</span>Streak Freeze</a>
+    <a class="sb-link" onclick="show('shortcuts')"><span class="sb-link-icon">⌨️</span>Keyboard Shortcuts</a>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-section-title">Data & Sync</div>
+    <a class="sb-link" onclick="show('sync')"><span class="sb-link-icon">🔄</span>Google Sheets Sync</a>
+    <a class="sb-link" onclick="show('export')"><span class="sb-link-icon">📄</span>Export & Reports</a>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-section-title">Reference</div>
+    <a class="sb-link" onclick="show('faq')"><span class="sb-link-icon">❓</span>FAQ</a>
+    <a class="sb-link" onclick="show('changelog')"><span class="sb-link-icon">📋</span>Changelog</a>
+  </div>
+
+  <div style="padding:20px 20px 0;margin-top:12px;border-top:1px solid var(--border)">
+    <a href="index.html" style="display:flex;align-items:center;gap:8px;background:var(--accent);color:#fff;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:600;text-decoration:none">
+      ← Back to Tracker
+    </a>
+  </div>
+</nav>
+
+<!-- MOBILE TOP -->
+<div class="mobile-top-nav">
+  <div style="font-size:14px;font-weight:700">📚 Docs</div>
+  <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰ Menu</button>
+</div>
+
+<!-- MOBILE DRAWER -->
+<div class="mobile-drawer" id="mobile-drawer">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <div style="font-size:15px;font-weight:700">Documentation</div>
+    <button onclick="toggleMobileMenu()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;color:var(--text2);cursor:pointer">✕ Close</button>
+  </div>
+  <div id="mobile-nav-links"></div>
+  <div style="margin-top:20px">
+    <a href="index.html" style="display:flex;align-items:center;gap:8px;background:var(--accent);color:#fff;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;text-decoration:none">← Back to Tracker</a>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<main class="main">
+
+<!-- ── OVERVIEW ─────────────────────────────────────────── -->
+<div class="section active" id="sec-overview">
+  <div class="hero-badge">Documentation v2.0</div>
+  <h1>🌱 Daily Learning Habit Tracker</h1>
+  <p>A personal learning and habit system built for <strong>Sathiyaseelan K</strong> — designed to make daily learning as natural as brushing your teeth. Everything lives in a single HTML file with no dependencies, syncing to Google Sheets automatically.</p>
+
+  <div class="callout callout-tip">The philosophy: <strong>show up every day, even for 30 minutes</strong>. Consistency beats intensity. This tracker makes showing up feel rewarding.</div>
+
+  <h2>What's in the Tracker</h2>
+  <div class="feature-grid">
+    <div class="feat-card"><div class="feat-card-icon">📅</div><div class="feat-card-title">Today View</div><div class="feat-card-desc">Daily check-in for all habits. Your home screen every morning.</div></div>
+    <div class="feat-card"><div class="feat-card-icon">✅</div><div class="feat-card-title">Habit Tracker</div><div class="feat-card-desc">Track any custom habit — exercise, meditation, water, sleep and more.</div></div>
+    <div class="feat-card"><div class="feat-card-icon">🎓</div><div class="feat-card-title">Learning Plans</div><div class="feat-card-desc">Structured GCP, Azure, AWS, NestJS, React plans with step-by-step guidance.</div></div>
+    <div class="feat-card"><div class="feat-card-icon">📖</div><div class="feat-card-title">Books & Reading</div><div class="feat-card-desc">1-hour daily reading habit with timer, progress tracking and log.</div></div>
+    <div class="feat-card"><div class="feat-card-icon">📊</div><div class="feat-card-title">Dashboard</div><div class="feat-card-desc">Streaks, XP, levels, heatmap and achievements all in one place.</div></div>
+    <div class="feat-card"><div class="feat-card-icon">💭</div><div class="feat-card-title">Live Quotes</div><div class="feat-card-desc">Fresh motivational quotes from Quotable.io API every day.</div></div>
+    <div class="feat-card"><div class="feat-card-icon">🍅</div><div class="feat-card-title">Pomodoro Timer</div><div class="feat-card-desc">25/5/15-min focus-break cycles with XP rewards.</div></div>
+    <div class="feat-card"><div class="feat-card-icon">⭐</div><div class="feat-card-title">XP & Levels</div><div class="feat-card-desc">10 levels from Cloud Rookie to Full Stack Legend.</div></div>
+    <div class="feat-card"><div class="feat-card-icon">📔</div><div class="feat-card-title">Daily Journal</div><div class="feat-card-desc">Reflect on what you learned, challenges, mood and tomorrow's goals.</div></div>
+    <div class="feat-card"><div class="feat-card-icon">🔄</div><div class="feat-card-title">Google Sheets Sync</div><div class="feat-card-desc">All progress auto-saved to your private Google Sheet.</div></div>
+  </div>
+
+  <h2>Two Files, Two Purposes</h2>
+  <table>
+    <tr><th>File</th><th>Purpose</th><th>URL</th></tr>
+    <tr><td><code>index.html</code></td><td>Main learning tracker — Today, Plans, Books, Quotes, Dashboard</td><td>your GitHub Pages root</td></tr>
+    <tr><td><code>habits.html</code></td><td>Dedicated habit tracker — full habit management, stats, heatmaps</td><td><code>/habits.html</code></td></tr>
+    <tr><td><code>docs.html</code></td><td>This documentation</td><td><code>/docs.html</code></td></tr>
+  </table>
+</div>
+
+<!-- ── SETUP ──────────────────────────────────────────────── -->
+<div class="section" id="sec-setup">
+  <h1>⚙️ Setup & Login</h1>
+  <p>The tracker uses Google Apps Script as a secure backend. Your data lives in your own Google Sheet — the tracker never sends data anywhere else.</p>
+
+  <h2>Your Credentials</h2>
+  <table>
+    <tr><th>Field</th><th>Value</th></tr>
+    <tr><td>Email</td><td><code>sathiya14ooty@gmail.com</code></td></tr>
+    <tr><td>Token</td><td><code>GCPSathiya@Tracker26</code></td></tr>
+    <tr><td>Google Sheet</td><td><a href="https://docs.google.com/spreadsheets/d/1lA6tH0HK8G185UP2Dn4MmQaJCOLXVI4rF4qPOPTfRQE" target="_blank">Open Sheet →</a></td></tr>
+    <tr><td>Apps Script URL</td><td>Deployed Web App (secured by token)</td></tr>
+  </table>
+
+  <div class="callout callout-warn">Never share your token. It is the key to your data. The token is stored in <code>sessionStorage</code> — it clears automatically when you close the browser tab.</div>
+
+  <h2>Login Steps</h2>
+  <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Open index.html</div><div class="step-desc">Open via GitHub Pages URL or directly from your desktop. The login screen appears automatically.</div></div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Enter email</div><div class="step-desc">Type <code>sathiya14ooty@gmail.com</code> — it may already be pre-filled.</div></div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Enter token</div><div class="step-desc">Type your access token and press Enter or tap the button.</div></div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">Auto-sync</div><div class="step-desc">Progress loads from Google Sheets. The green dot in the top-right means you are synced.</div></div></div>
+
+  <h2>Staying Logged In</h2>
+  <p>The tracker stores your token in <code>sessionStorage</code>. This means:</p>
+  <table>
+    <tr><th>Situation</th><th>Result</th></tr>
+    <tr><td>Refresh the page</td><td>✅ Still logged in</td></tr>
+    <tr><td>Open same tab</td><td>✅ Still logged in</td></tr>
+    <tr><td>Close the tab / browser</td><td>🔒 Logged out — re-enter token</td></tr>
+    <tr><td>Open in new tab</td><td>🔒 Logged out — re-enter token</td></tr>
+  </table>
+
+  <h2>Accessing on Mobile (iPhone)</h2>
+  <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Open GitHub Pages URL in Safari</div><div class="step-desc">Go to <code>https://sathiyaseelanK.github.io/learning-tracker/</code></div></div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Add to Home Screen</div><div class="step-desc">Tap Share → "Add to Home Screen" → it opens like a native app, full-screen, no browser bar.</div></div></div>
+</div>
+
+<!-- ── STRUCTURE ───────────────────────────────────────────── -->
+<div class="section" id="sec-structure">
+  <h1>📁 File Structure</h1>
+  <p>Three files in your GitHub repository:</p>
+  <pre><code>learning-tracker/
+├── index.html     ← Main tracker (Today, Plans, Books, Quotes, Dashboard)
+├── habits.html    ← Dedicated habit tracker (separate page)
+└── docs.html      ← This documentation</code></pre>
+
+  <h2>Why two separate files?</h2>
+  <p>The habits tracker is a distinct use case — it's about daily life habits (exercise, sleep, water), while the main tracker is about deep learning (GCP, books). Keeping them separate means:</p>
+  <table>
+    <tr><th>Benefit</th><th>Detail</th></tr>
+    <tr><td>Faster load</td><td>Each file loads only what it needs — no bloat</td></tr>
+    <tr><td>Cleaner focus</td><td>Open habits.html for daily check-in, index.html for learning</td></tr>
+    <tr><td>Independent updates</td><td>Update one without touching the other</td></tr>
+    <tr><td>Shared data</td><td>Both use the same Google Sheet — data is shared automatically</td></tr>
+  </table>
+
+  <h2>Data storage</h2>
+  <table>
+    <tr><th>Data type</th><th>Where stored</th><th>Persists?</th></tr>
+    <tr><td>Session progress (done/skipped)</td><td>Google Sheets</td><td>✅ Forever</td></tr>
+    <tr><td>Books library & reading log</td><td>localStorage + Sheets</td><td>✅ Yes</td></tr>
+    <tr><td>Custom habits & logs</td><td>localStorage + Sheets</td><td>✅ Yes</td></tr>
+    <tr><td>Saved quotes</td><td>localStorage</td><td>✅ Per device</td></tr>
+    <tr><td>Journal entries</td><td>localStorage</td><td>✅ Per device</td></tr>
+    <tr><td>Bookmarks</td><td>localStorage</td><td>✅ Per device</td></tr>
+    <tr><td>Login token</td><td>sessionStorage</td><td>🔒 Tab only</td></tr>
+    <tr><td>Theme preference</td><td>localStorage</td><td>✅ Yes</td></tr>
+  </table>
+</div>
+
+<!-- ── TODAY ──────────────────────────────────────────────── -->
+<div class="section" id="sec-today">
+  <h1>📅 Today View</h1>
+  <p>This is your <strong>home screen</strong> — open it every morning. It shows everything you need to do today in one place.</p>
+
+  <h2>What you see</h2>
+  <table>
+    <tr><th>Section</th><th>What it does</th></tr>
+    <tr><td>Date & Greeting</td><td>Today's date, your streak count, personalised greeting</td></tr>
+    <tr><td>Day Summary Bar</td><td>Streak 🔥, Sessions done ✅, Remaining 📚, Freeze tokens 🧊</td></tr>
+    <tr><td>Week Grid</td><td>Mon–Sun dots showing done (green), skipped (yellow), missed (grey) at a glance</td></tr>
+    <tr><td>Habits Card</td><td>Emoji grid of today's habits — tap any icon to instantly mark done</td></tr>
+    <tr><td>Learning Session Cards</td><td>Today's scheduled GCP/Azure/etc sessions with Done/Skip/Open buttons</td></tr>
+    <tr><td>Reading Habit Card</td><td>Current book, progress bar toward 60-min daily goal, Start Reading button</td></tr>
+    <tr><td>Quote Strip</td><td>Live motivational quote from Quotable.io with Save and Shuffle buttons</td></tr>
+    <tr><td>Tools Row</td><td>🍅 Pomodoro, ⏱️ Timer, 📔 Journal, 🧊 Freeze, 🎯 Focus, ⌨️ Shortcuts</td></tr>
+  </table>
+
+  <h2>Marking a session done</h2>
+  <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Tap ✓ Done</div><div class="step-desc">On the session card in Today view. Syncs to Google Sheets immediately.</div></div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Rate the session</div><div class="step-desc">A rating popup appears — 1–5 stars plus Easy/Medium/Hard difficulty. Optional but recommended.</div></div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Write a note</div><div class="step-desc">The note field auto-saves every 2 seconds as you type. Notes build your personal knowledge base.</div></div></div>
+
+  <div class="callout callout-tip">Opening the session card shows full step-by-step guidance, links, and Node.js code samples. Tap any guide block to expand it. Tap ☆ to bookmark important steps.</div>
+</div>
+
+<!-- ── DASHBOARD ──────────────────────────────────────────── -->
+<div class="section" id="sec-dashboard">
+  <h1>📊 Dashboard</h1>
+  <p>Your progress at a glance. Open it for a weekly review or whenever you want motivation.</p>
+
+  <h2>What you see</h2>
+  <table>
+    <tr><th>Section</th><th>Detail</th></tr>
+    <tr><td>🔥 Streak Hero</td><td>Current streak, best streak ever, fire animation</td></tr>
+    <tr><td>⭐ XP Level Bar</td><td>Your XP total, current level, progress to next level — tap for full breakdown</td></tr>
+    <tr><td>Mini Stats</td><td>Sessions done, Achievements unlocked, Pomodoros completed</td></tr>
+    <tr><td>Plans Progress</td><td>Progress bar per plan — GCP, Azure, AWS etc</td></tr>
+    <tr><td>Activity Heatmap</td><td>52-week GitHub-style heatmap — green = done, yellow = skipped</td></tr>
+    <tr><td>Achievements Grid</td><td>All 30+ achievements with progress bars for locked ones</td></tr>
+  </table>
+</div>
+
+<!-- ── HABITS ──────────────────────────────────────────────── -->
+<div class="section" id="sec-habits">
+  <h1>✅ Habits Tracker</h1>
+  <p>Track any daily habit alongside your learning. Lives in <code>habits.html</code> — a completely separate page so it doesn't clutter the learning view.</p>
+
+  <h2>Creating a habit</h2>
+  <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Open habits.html</div><div class="step-desc">From the main tracker, tap "Habits" in the menu, or open the URL directly.</div></div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Tap + Add</div><div class="step-desc">Enter name, icon, color, category, frequency, and daily goal.</div></div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Or use Quick Presets</div><div class="step-desc">Tap ⚡ Presets — 10 common habits ready to add in one tap.</div></div></div>
+
+  <h2>Frequency options</h2>
+  <table>
+    <tr><th>Frequency</th><th>When it appears</th></tr>
+    <tr><td>Every day</td><td>All 7 days</td></tr>
+    <tr><td>Mon–Fri</td><td>Weekdays only — weekends are rest days</td></tr>
+    <tr><td>Weekends</td><td>Saturday and Sunday only</td></tr>
+    <tr><td>Custom</td><td>Pick exactly which days of the week</td></tr>
+  </table>
+
+  <h2>Preset habits</h2>
+  <table>
+    <tr><th>Habit</th><th>Default goal</th><th>Category</th></tr>
+    <tr><td>🚶 Morning Walk</td><td>30 min</td><td>Fitness</td></tr>
+    <tr><td>🧘 Meditation</td><td>10 min</td><td>Mindfulness</td></tr>
+    <tr><td>💧 Drink Water</td><td>8 glasses</td><td>Health</td></tr>
+    <tr><td>💪 Exercise</td><td>30 min</td><td>Fitness</td></tr>
+    <tr><td>📵 No Social Media</td><td>Daily</td><td>Productivity</td></tr>
+    <tr><td>😴 Sleep by 10 PM</td><td>Daily</td><td>Health</td></tr>
+    <tr><td>🙏 Gratitude Journal</td><td>Daily</td><td>Mindfulness</td></tr>
+    <tr><td>🥗 No Junk Food</td><td>Daily</td><td>Health</td></tr>
+    <tr><td>📞 Call Family</td><td>Weekly</td><td>Social</td></tr>
+    <tr><td>💰 Save Money</td><td>₹100/day</td><td>Finance</td></tr>
+  </table>
+
+  <h2>Logging habits</h2>
+  <p>From Today view: tap the emoji icon in the habits grid to instantly mark done. From the Habits page: tap ✓ Done on the card, or use ✍️ Log with note to add details. For numeric goals (e.g. 8 glasses of water), a count input appears when logging.</p>
+
+  <h2>Habit detail page</h2>
+  <p>Tap any habit card to open its detail page. Shows:</p>
+  <table>
+    <tr><th>Stat</th><th>What it means</th></tr>
+    <tr><td>🔥 Streak</td><td>Consecutive scheduled days completed in a row</td></tr>
+    <tr><td>7d rate</td><td>Completion % in the last 7 days</td></tr>
+    <tr><td>30d rate</td><td>Completion % in the last 30 days</td></tr>
+    <tr><td>Total done</td><td>All-time count of completions</td></tr>
+    <tr><td>Heatmap</td><td>Last 13 weeks activity grid</td></tr>
+    <tr><td>Recent notes</td><td>All logged notes in reverse order</td></tr>
+  </table>
+</div>
+
+<!-- ── PLANS ──────────────────────────────────────────────── -->
+<div class="section" id="sec-plans">
+  <h1>🎓 Learning Plans</h1>
+  <p>Structured learning paths scheduled as daily weekday sessions from 3–4 PM. Each session has a title, focus topics, a tip, and a step-by-step guide with direct links.</p>
+
+  <h2>Available plans</h2>
+  <table>
+    <tr><th>Plan</th><th>Sessions</th><th>Status</th></tr>
+    <tr><td>☁️ Google Cloud (GCP)</td><td>22 sessions</td><td><span class="badge badge-green">Full content</span></td></tr>
+    <tr><td>🔷 Microsoft Azure</td><td>18 sessions</td><td><span class="badge badge-yellow">Add when GCP done</span></td></tr>
+    <tr><td>🟠 Amazon AWS</td><td>20 sessions</td><td><span class="badge badge-yellow">Placeholder</span></td></tr>
+    <tr><td>🤖 GitHub Copilot & AI</td><td>10 sessions</td><td><span class="badge badge-yellow">Placeholder</span></td></tr>
+    <tr><td>🌐 Sitecore CMS</td><td>15 sessions</td><td><span class="badge badge-yellow">Placeholder</span></td></tr>
+    <tr><td>🐈 NestJS</td><td>12 sessions</td><td><span class="badge badge-yellow">Placeholder</span></td></tr>
+    <tr><td>⚛️ React JS</td><td>14 sessions</td><td><span class="badge badge-yellow">Placeholder</span></td></tr>
+    <tr><td>🛠️ Custom</td><td>You define</td><td><span class="badge badge-blue">Build your own</span></td></tr>
+  </table>
+
+  <h2>Schedule logic</h2>
+  <p>Sessions are assigned to weekdays (Mon–Fri) starting 25 Sep 2026. The schedule updates automatically when you:</p>
+  <table>
+    <tr><th>Action</th><th>Effect on schedule</th></tr>
+    <tr><td>Complete a session</td><td>Next session moves to the next weekday</td></tr>
+    <tr><td>Complete multiple in one day</td><td>Following sessions pull forward — saves future days</td></tr>
+    <tr><td>Skip a session</td><td>Moves to the end of the plan — doesn't break the chain</td></tr>
+    <tr><td>Miss a day</td><td>Session shows as "today" the next time you open — no sessions are lost</td></tr>
+  </table>
+
+  <h2>Custom plan builder</h2>
+  <p>In the Plans tab, tap <strong>🛠️ Custom Plan</strong>. Enter a name, icon, description, color and sessions (one per line). The plan is added to your schedule after all existing plans complete.</p>
+
+  <h2>Session bookmarks</h2>
+  <p>Inside any session's step-by-step guide, tap <strong>☆</strong> next to any step to bookmark it. Access all bookmarks from Plans → 🔖 Bookmarks. Tapping a bookmark takes you directly back to that step.</p>
+</div>
+
+<!-- ── BOOKS ──────────────────────────────────────────────── -->
+<div class="section" id="sec-books">
+  <h1>📖 Books & Reading</h1>
+  <p>Build a 1-hour daily reading habit. Track every book, log sessions with the timer, and see your reading history grow.</p>
+
+  <h2>Adding a book</h2>
+  <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Tap + Add Book</div><div class="step-desc">Enter title, author, genre, total pages, cover emoji, and status (Want / Reading / Finished).</div></div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Set it as "Reading"</div><div class="step-desc">Only one book should be in Reading status at a time — that's the one shown on Today's reading card.</div></div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Start reading at your chosen time</div><div class="step-desc">Tap ▶ Start Reading on the Today card — the timer counts up automatically.</div></div></div>
+
+  <h2>Reading timer</h2>
+  <table>
+    <tr><th>Time</th><th>Timer colour</th></tr>
+    <tr><td>0 – 30 min</td><td>Purple — warming up</td></tr>
+    <tr><td>30 – 60 min</td><td>Yellow — halfway there</td></tr>
+    <tr><td>60 min +</td><td>Green — goal reached 🎉</td></tr>
+  </table>
+  <p>When you stop the timer (tap ✕), a modal asks for pages read and a note. Both are optional. The session is logged even if you skip the note.</p>
+
+  <h2>Manual logging</h2>
+  <p>Read on Kindle or paper without the app? Tap <strong>✍️ Log manually</strong> on Today's reading card or in the book detail page. Enter minutes, pages, and a note.</p>
+
+  <h2>Book statuses</h2>
+  <table>
+    <tr><th>Status</th><th>What it means</th></tr>
+    <tr><td>📌 Want to Read</td><td>In your reading list — not started yet</td></tr>
+    <tr><td>📖 Currently Reading</td><td>Active reading — shows on Today page</td></tr>
+    <tr><td>✅ Finished</td><td>Completed — rate it and write a review</td></tr>
+  </table>
+</div>
+
+<!-- ── QUOTES ──────────────────────────────────────────────── -->
+<div class="section" id="sec-quotes">
+  <h1>💭 Live Quotes</h1>
+  <p>Fresh motivational quotes fetched live from <strong>Quotable.io</strong> — a free, open-source library of 1,500+ curated quotes.</p>
+
+  <h2>How it works</h2>
+  <table>
+    <tr><th>Situation</th><th>What happens</th></tr>
+    <tr><td>Online</td><td>Fetches a fresh quote from Quotable.io API</td></tr>
+    <tr><td>Offline</td><td>Shows the last fetched quote from cache</td></tr>
+    <tr><td>API down</td><td>Falls back to 20 built-in offline quotes silently</td></tr>
+    <tr><td>Same day</td><td>Caches today's quote — stays consistent all day</td></tr>
+  </table>
+
+  <h2>Quote categories</h2>
+  <table>
+    <tr><th>Category</th><th>Theme</th></tr>
+    <tr><td>📚 Learning</td><td>Education, knowledge, growth mindset</td></tr>
+    <tr><td>🔥 Consistency</td><td>Habits, discipline, daily effort</td></tr>
+    <tr><td>💻 Tech</td><td>Programming, software, technology</td></tr>
+    <tr><td>🌱 Growth</td><td>Courage, change, goals, overcoming</td></tr>
+    <tr><td>☁️ Career</td><td>Cloud, business, professional growth</td></tr>
+  </table>
+
+  <h2>Saving quotes</h2>
+  <p>Tap <strong>🤍 Save</strong> on any quote — in Today strip, in the Quotes tab, or in Browse view. Saved quotes appear in the ❤️ Saved tab. Export your collection as a PDF from there.</p>
+</div>
+
+<!-- ── TIMERS ──────────────────────────────────────────────── -->
+<div class="section" id="sec-timers">
+  <h1>⏱️ Pomodoro & Timers</h1>
+  <p>Three timer modes in a floating widget (bottom-left corner).</p>
+
+  <h2>Pomodoro Timer 🍅</h2>
+  <p>The classic Pomodoro technique — proven to boost focus and prevent burnout.</p>
+  <table>
+    <tr><th>Phase</th><th>Duration</th><th>When</th></tr>
+    <tr><td>🍅 Focus</td><td>25 minutes</td><td>Deep work — no distractions</td></tr>
+    <tr><td>☕ Short Break</td><td>5 minutes</td><td>After every focus session</td></tr>
+    <tr><td>😴 Long Break</td><td>15 minutes</td><td>After every 4th Pomodoro</td></tr>
+  </table>
+  <p>Each completed Pomodoro earns <strong>+15 XP</strong> and counts toward the 🍅 Pomodoro Master achievement.</p>
+
+  <h2>Session Timer ⏱️</h2>
+  <p>A 2-hour countdown for your learning session (3–4 PM daily slot).</p>
+  <table>
+    <tr><th>Time remaining</th><th>Colour</th></tr>
+    <tr><td>Over 30 minutes</td><td>Green — on track</td></tr>
+    <tr><td>Under 30 minutes</td><td>Yellow — wrapping up</td></tr>
+    <tr><td>Under 10 minutes</td><td>Red — finish up!</td></tr>
+  </table>
+
+  <h2>Reading Timer 📖</h2>
+  <p>Counts up from 0 toward the 60-minute daily reading goal. Starts from the Today card or Book detail page. Logs the session automatically when stopped.</p>
+
+  <h2>Using the timer widget</h2>
+  <table>
+    <tr><th>Button</th><th>Action</th></tr>
+    <tr><td>Pause / Resume</td><td>Pause without losing progress</td></tr>
+    <tr><td>Reset</td><td>Return to start without closing</td></tr>
+    <tr><td>✕ Close</td><td>Stop and close (logs reading session if applicable)</td></tr>
+  </table>
+</div>
+
+<!-- ── GAMIFICATION ───────────────────────────────────────── -->
+<div class="section" id="sec-gamification">
+  <h1>⭐ XP, Levels & Achievements</h1>
+
+  <h2>How to earn XP</h2>
+  <div class="xp-row"><div class="xp-icon">✅</div><div class="xp-label">Complete a learning session</div><div class="xp-val">+100 XP</div></div>
+  <div class="xp-row"><div class="xp-icon">🔥</div><div class="xp-label">Per streak day maintained</div><div class="xp-val">+25 XP</div></div>
+  <div class="xp-row"><div class="xp-icon">📝</div><div class="xp-label">Write notes on a session</div><div class="xp-val">+20 XP</div></div>
+  <div class="xp-row"><div class="xp-icon">🍅</div><div class="xp-label">Complete a Pomodoro</div><div class="xp-val">+15 XP</div></div>
+  <div class="xp-row"><div class="xp-icon">🏆</div><div class="xp-label">Unlock an achievement</div><div class="xp-val">+250 XP</div></div>
+  <div class="xp-row"><div class="xp-icon">🎯</div><div class="xp-label">Complete a daily challenge</div><div class="xp-val">+50–150 XP</div></div>
+
+  <h2>Levels</h2>
+  <div class="level-row"><div class="level-icon">🌱</div><div class="level-name">Cloud Rookie</div><div class="level-xp">Level 1 · 0 XP</div></div>
+  <div class="level-row"><div class="level-icon">🔭</div><div class="level-name">GCP Explorer</div><div class="level-xp">Level 2 · 500 XP</div></div>
+  <div class="level-row"><div class="level-icon">⚙️</div><div class="level-name">Cloud Apprentice</div><div class="level-xp">Level 3 · 1,200 XP</div></div>
+  <div class="level-row"><div class="level-icon">⚡</div><div class="level-name">Function Builder</div><div class="level-xp">Level 4 · 2,500 XP</div></div>
+  <div class="level-row"><div class="level-icon">📊</div><div class="level-name">Data Engineer</div><div class="level-xp">Level 5 · 4,000 XP</div></div>
+  <div class="level-row"><div class="level-icon">☁️</div><div class="level-name">Cloud Developer</div><div class="level-xp">Level 6 · 6,000 XP</div></div>
+  <div class="level-row"><div class="level-icon">🔷</div><div class="level-name">Multi-Cloud Pro</div><div class="level-xp">Level 7 · 9,000 XP</div></div>
+  <div class="level-row"><div class="level-icon">🏗️</div><div class="level-name">Cloud Architect</div><div class="level-xp">Level 8 · 13,000 XP</div></div>
+  <div class="level-row"><div class="level-icon">🎯</div><div class="level-name">Tech Lead</div><div class="level-xp">Level 9 · 18,000 XP</div></div>
+  <div class="level-row"><div class="level-icon">🏆</div><div class="level-name">Full Stack Legend</div><div class="level-xp">Level 10 · 25,000 XP</div></div>
+
+  <h2>Achievements (30+)</h2>
+  <table>
+    <tr><th>Category</th><th>Achievements</th></tr>
+    <tr><td>Learning</td><td>First Step, 3-Day Streak, First Week, Week Warrior, Halfway, Speed Runner, Fortnight, Century Club, Perfect Week, GCP Complete, Azure Ready, AWS Certified, Multi-Cloud, Full Stack Hero</td></tr>
+    <tr><td>Writing</td><td>Note Taker (5 sessions with notes)</td></tr>
+    <tr><td>Pomodoro</td><td>Pomodoro Master (10 Pomodoros)</td></tr>
+    <tr><td>Books</td><td>First Book, 1 Hour Reader, Page Turner, Bookworm, Reading Streak</td></tr>
+    <tr><td>Habits</td><td>Habit Starter, Habit Builder, Habit Week, Habit Month, Perfect Day, 100 Done</td></tr>
+  </table>
+</div>
+
+<!-- ── JOURNAL ────────────────────────────────────────────── -->
+<div class="section" id="sec-journal">
+  <h1>📔 Daily Reflection Journal</h1>
+  <p>A private daily journal to consolidate learning. Proven to improve retention — writing what you learned makes it stick 3x better than passive reading.</p>
+
+  <h2>Journal prompts</h2>
+  <table>
+    <tr><th>Prompt</th><th>What to write</th></tr>
+    <tr><td>What did you learn today?</td><td>Key concepts, insights, discoveries — even one sentence is enough</td></tr>
+    <tr><td>What was challenging?</td><td>Anything confusing or hard to grasp — write it so you can revisit</td></tr>
+    <tr><td>Tomorrow's focus</td><td>What will you tackle next? Primes your brain overnight</td></tr>
+    <tr><td>Mood</td><td>😴 Tired → 🚀 Energised — tracks how you feel about your progress over time</td></tr>
+  </table>
+
+  <div class="callout callout-tip">Even 2 minutes of journaling makes a difference. Open it with <kbd>J</kbd> key or tap 📔 Journal in the Today tools row.</div>
+
+  <h2>Viewing history</h2>
+  <p>In the journal modal, tap <strong>History →</strong> to see all past entries in reverse-chronological order. Each entry shows date, mood emoji, and all three responses.</p>
+</div>
+
+<!-- ── FOCUS ──────────────────────────────────────────────── -->
+<div class="section" id="sec-focus">
+  <h1>🎯 Focus Mode</h1>
+  <p>Hides the top bar, bottom navigation and all UI chrome — leaving only your session content on screen. Designed for distraction-free deep work.</p>
+
+  <h2>Activating Focus Mode</h2>
+  <table>
+    <tr><th>Method</th><th>How</th></tr>
+    <tr><td>Keyboard</td><td>Press <kbd>F</kbd></td></tr>
+    <tr><td>Tools row</td><td>Tap 🎯 Focus in Today's tools row</td></tr>
+  </table>
+
+  <p>A minimal focus bar appears at the top with just a Pomodoro button and an Exit Focus button. Everything else disappears.</p>
+  <p>To exit: tap <strong>Exit Focus</strong> in the top bar, or press <kbd>F</kbd> again.</p>
+
+  <div class="callout callout-info">Combine Focus Mode + Pomodoro for maximum deep work. Start a Pomodoro, activate Focus Mode, put your phone face-down.</div>
+</div>
+
+<!-- ── FREEZE ──────────────────────────────────────────────── -->
+<div class="section" id="sec-freeze">
+  <h1>🧊 Streak Freeze</h1>
+  <p>Protect your learning streak on days when life gets in the way — a work crisis, travel, illness. Use a freeze token and your streak stays intact.</p>
+
+  <h2>How to earn freezes</h2>
+  <p>You earn <strong>1 freeze token for every 5 sessions completed</strong>. The counter is automatic — no action needed. Tap 🧊 Freeze in the Today tools row to see your current count and when you earn the next one.</p>
+
+  <h2>Using a freeze</h2>
+  <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Tap 🧊 Freeze in Today tools row</div><div class="step-desc">Opens the Streak Freeze info modal showing your current freeze count.</div></div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Tap "Use Freeze Today"</div><div class="step-desc">Consumes 1 freeze token and marks today as protected. You can only use 1 per day.</div></div></div>
+
+  <table>
+    <tr><th>Scenario</th><th>Freeze behaviour</th></tr>
+    <tr><td>Used today already</td><td>Shows "already used" — can't use again same day</td></tr>
+    <tr><td>No freezes left</td><td>Button is disabled — complete 5 more sessions to earn one</td></tr>
+    <tr><td>Streak = 0</td><td>Freeze won't restore a broken streak — only prevents breaking it</td></tr>
+  </table>
+</div>
+
+<!-- ── SHORTCUTS ──────────────────────────────────────────── -->
+<div class="section" id="sec-shortcuts">
+  <h1>⌨️ Keyboard Shortcuts</h1>
+  <p>All shortcuts work when no input field is focused. Press <kbd>?</kbd> inside the app to see the shortcuts popup.</p>
+
+  <table>
+    <tr><th>Key</th><th>Action</th></tr>
+    <tr><td><kbd>1</kbd></td><td>Switch to Today tab</td></tr>
+    <tr><td><kbd>2</kbd></td><td>Switch to Dashboard tab</td></tr>
+    <tr><td><kbd>3</kbd></td><td>Switch to Habits tab</td></tr>
+    <tr><td><kbd>4</kbd></td><td>Switch to Plans tab</td></tr>
+    <tr><td><kbd>5</kbd></td><td>Switch to Books tab</td></tr>
+    <tr><td><kbd>P</kbd></td><td>Start Pomodoro timer</td></tr>
+    <tr><td><kbd>T</kbd></td><td>Start 2-hour session timer</td></tr>
+    <tr><td><kbd>F</kbd></td><td>Toggle Focus Mode</td></tr>
+    <tr><td><kbd>J</kbd></td><td>Open Daily Journal</td></tr>
+    <tr><td><kbd>B</kbd></td><td>Open Bookmarks</td></tr>
+    <tr><td><kbd>R</kbd></td><td>Open Monthly Report</td></tr>
+    <tr><td><kbd>?</kbd></td><td>Show shortcuts popup</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Close any open modal</td></tr>
+  </table>
+</div>
+
+<!-- ── SYNC ──────────────────────────────────────────────── -->
+<div class="section" id="sec-sync">
+  <h1>🔄 Google Sheets Sync</h1>
+  <p>All progress auto-syncs to your private Google Sheet via Google Apps Script. No third-party services — your data never leaves Google's infrastructure.</p>
+
+  <h2>Sync indicator</h2>
+  <table>
+    <tr><th>Dot colour</th><th>Meaning</th></tr>
+    <tr><td>🟢 Green</td><td>Synced — all changes saved</td></tr>
+    <tr><td>🟡 Yellow (pulsing)</td><td>Syncing — request in flight</td></tr>
+    <tr><td>🔴 Red</td><td>Sync failed — check internet connection</td></tr>
+  </table>
+
+  <h2>What syncs to Sheets</h2>
+  <table>
+    <tr><th>Data</th><th>Sheet row format</th></tr>
+    <tr><td>Session status</td><td><code>gcp:1</code> → completed / skipped</td></tr>
+    <tr><td>Session notes</td><td>Stored in the note column alongside status</td></tr>
+    <tr><td>Books library</td><td>Stored as JSON in <code>meta:books</code> row</td></tr>
+    <tr><td>Custom habits</td><td>Stored as JSON in <code>meta:habits</code> row</td></tr>
+    <tr><td>Active plan</td><td>Stored in <code>meta:activePlan</code> row</td></tr>
+    <tr><td>Enabled plans</td><td>Stored in <code>meta:enabledPlans</code> row</td></tr>
+  </table>
+
+  <div class="callout callout-warn">If sync fails on a session mark, the tracker shows a red dot. Your action is recorded locally — try refreshing and marking again. Data is never silently lost.</div>
+
+  <h2>Viewing your data</h2>
+  <p><a href="https://docs.google.com/spreadsheets/d/1lA6tH0HK8G185UP2Dn4MmQaJCOLXVI4rF4qPOPTfRQE" target="_blank">Open your Google Sheet →</a></p>
+  <p>The sheet has columns: <code>moduleId</code>, <code>status</code>, <code>note</code>, <code>updatedAt</code>, <code>email</code>.</p>
+</div>
+
+<!-- ── EXPORT ──────────────────────────────────────────────── -->
+<div class="section" id="sec-export">
+  <h1>📄 Export & Reports</h1>
+
+  <h2>Weekly Summary</h2>
+  <p>Tap 📊 Summary in the Today tools row. Shows sessions done this week, notes written, streak, XP, and next week's schedule. Tap 📋 Copy to copy as plain text — paste into an email or WhatsApp.</p>
+
+  <h2>Monthly Report</h2>
+  <p>In the Plans tab, tap 📊 Monthly. Full month breakdown: sessions, skipped, weekly bar chart, average rating, reading time, XP, level, habits status. Copy to clipboard.</p>
+
+  <h2>Progress PDF</h2>
+  <p>Press <kbd>R</kbd> or tap Monthly → opens browser print dialog. Print or Save as PDF. Includes all sessions, notes, ratings, and achievements in a formatted report.</p>
+
+  <h2>Notes PDF</h2>
+  <p>From the Notes Library (Plans tab → 📝 Notes), tap 📄 Export PDF. All your study notes formatted as a document you can keep.</p>
+
+  <h2>Saved Quotes PDF</h2>
+  <p>In the Quotes tab → ❤️ Saved, tap 📄 Export as PDF. Your personal quote collection beautifully formatted.</p>
+</div>
+
+<!-- ── FAQ ──────────────────────────────────────────────── -->
+<div class="section" id="sec-faq">
+  <h1>❓ FAQ</h1>
+
+  <h3>My streak broke even though I studied — what happened?</h3>
+  <p>The streak counts days where at least one session was marked <em>complete</em> (not just skipped). If you only skipped sessions that day, the streak won't count it. If you genuinely studied, mark the session as Done and it will backfill.</p>
+
+  <h3>Can I access this on my iPhone?</h3>
+  <p>Yes. Open the GitHub Pages URL in Safari → tap Share → Add to Home Screen. It opens full-screen like a native app.</p>
+
+  <h3>I lost my streak — can I get it back?</h3>
+  <p>If you completed a session but forgot to mark it, open the Plans tab, find the session, tap it, and mark it Done. The streak recalculates from the actual completion dates.</p>
+
+  <h3>Can two people use the same tracker?</h3>
+  <p>No — it's designed for one user. The Google Sheet is tied to your email and token. To share progress, use the LinkedIn share feature or copy the Weekly Summary.</p>
+
+  <h3>My session notes disappeared</h3>
+  <p>Notes auto-save every 2 seconds while you type, but only if the session has already been marked Done or Skipped. If the session is still Pending, notes are saved as a local draft. Complete the session first, then the notes are permanently saved to Google Sheets.</p>
+
+  <h3>The quotes aren't loading</h3>
+  <p>Quotable.io may be temporarily down. The tracker falls back silently to locally cached or built-in quotes. Try tapping 🔀 New quote — if it loads, the API is back up.</p>
+
+  <h3>How do I add the Azure plan?</h3>
+  <p>In the Plans tab, tap + Add Plan and select Microsoft Azure. It will be scheduled to start the day after your last GCP session completes.</p>
+
+  <h3>Can I edit a session I already marked?</h3>
+  <p>Yes. Open the session in the Plans tab and tap ↩ Undo to reset it to Pending, then re-mark with the correct status.</p>
+
+  <h3>The page loads slowly on first open</h3>
+  <p>The first load fetches your data from Google Sheets (1–2 seconds on WiFi, 3–4 seconds on mobile data). Subsequent loads in the same session are instant. If it's consistently slow, check your internet connection.</p>
+
+  <h3>My habits data disappeared</h3>
+  <p>Habits are stored in localStorage (per device) and synced to Google Sheets. If localStorage was cleared (e.g. browser reset), the app reloads from Google Sheets on next login — data is safe.</p>
+</div>
+
+<!-- ── CHANGELOG ──────────────────────────────────────────── -->
+<div class="section" id="sec-changelog">
+  <h1>📋 Changelog</h1>
+
+  <h3>v3.0 — Current</h3>
+  <table>
+    <tr><th>Change</th><th>Detail</th></tr>
+    <tr><td>✅ Habits Tracker</td><td>Separate habits.html page — full CRUD, presets, heatmap, stats, achievements</td></tr>
+    <tr><td>🌐 Live Quotes API</td><td>Quotable.io integration — fresh quotes daily, category filter, browse mode</td></tr>
+    <tr><td>📔 Daily Journal</td><td>Reflection prompts, mood selector, history view</td></tr>
+    <tr><td>🧊 Streak Freeze</td><td>Earn tokens per 5 sessions, protect streak on missed days</td></tr>
+    <tr><td>⭐ Session Rating</td><td>1–5 stars + difficulty after each completed session</td></tr>
+    <tr><td>🎯 Focus Mode</td><td>Hides all UI chrome for distraction-free sessions</td></tr>
+    <tr><td>🛠️ Custom Plans</td><td>Build any learning plan with custom sessions</td></tr>
+    <tr><td>🔖 Bookmarks</td><td>Bookmark specific guide steps for quick reference</td></tr>
+    <tr><td>📊 Monthly Report</td><td>Full month breakdown with weekly bar chart</td></tr>
+    <tr><td>⌨️ Shortcuts</td><td>Full keyboard shortcut system</td></tr>
+    <tr><td>📚 Docs</td><td>This documentation file</td></tr>
+  </table>
+
+  <h3>v2.0</h3>
+  <table>
+    <tr><th>Change</th><th>Detail</th></tr>
+    <tr><td>📖 Books tracker</td><td>Library, reading timer, log, ratings, reviews</td></tr>
+    <tr><td>🍅 Pomodoro</td><td>25/5/15 phases with XP rewards</td></tr>
+    <tr><td>📱 Mobile-first rebuild</td><td>Bottom nav, swipe gestures, full responsive layout</td></tr>
+    <tr><td>⭐ XP & Levels</td><td>10-level progression system</td></tr>
+    <tr><td>🏆 Achievements</td><td>30+ achievements across learning, books, habits</td></tr>
+    <tr><td>🗺️ Plan Roadmap</td><td>Visual timeline of all 7 learning plans</td></tr>
+    <tr><td>💼 LinkedIn Share</td><td>One-tap post generator on plan completion</td></tr>
+  </table>
+
+  <h3>v1.0</h3>
+  <p>Initial release — GCP learning plan, Google Sheets sync, session scheduling, skip/complete/undo.</p>
+</div>
+
+</main>
+</div>
+
+<script>
+function show(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.sb-link').forEach(l=>l.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  document.querySelectorAll('.sb-link').forEach(l=>{
+    if(l.getAttribute('onclick')===`show('${id}')`) l.classList.add('active');
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+  document.getElementById('mobile-drawer').classList.remove('open');
+}
+
+function toggleMobileMenu(){
+  const d=document.getElementById('mobile-drawer');
+  d.classList.toggle('open');
+  if(d.classList.contains('open')&&!document.getElementById('mobile-nav-links').children.length){
+    // Clone sidebar links into mobile drawer
+    document.getElementById('mobile-nav-links').innerHTML=document.getElementById('sidebar').innerHTML.replace(/<a href="index\.html"[\s\S]*?<\/a>/,'');
+  }
+}
+</script>
+</body>
+</html>
