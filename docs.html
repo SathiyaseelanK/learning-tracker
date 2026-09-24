@@ -131,6 +131,9 @@ kbd{background:var(--surface2);border:1px solid var(--border2);border-radius:5px
   <div class="sb-logo">
     <div class="sb-logo-title"><span>🌱 Learning Habit</span></div>
     <div class="sb-logo-sub">Documentation & Help</div>
+    <a href="index.html" style="display:flex;align-items:center;justify-content:center;gap:6px;background:var(--accent);color:#fff;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;text-decoration:none;margin-top:12px">
+      🏠 Back to Tracker
+    </a>
   </div>
 
   <div class="sb-section">
@@ -186,20 +189,19 @@ kbd{background:var(--surface2);border:1px solid var(--border2);border-radius:5px
 
 <!-- MOBILE TOP -->
 <div class="mobile-top-nav">
+  <a href="index.html" style="display:flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);text-decoration:none;font-size:12px;font-weight:600">🏠 Tracker</a>
   <div style="font-size:14px;font-weight:700">📚 Docs</div>
   <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰ Menu</button>
 </div>
 
 <!-- MOBILE DRAWER -->
 <div class="mobile-drawer" id="mobile-drawer">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
     <div style="font-size:15px;font-weight:700">Documentation</div>
     <button onclick="toggleMobileMenu()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;color:var(--text2);cursor:pointer">✕ Close</button>
   </div>
+  <a href="index.html" style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--accent);color:#fff;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;text-decoration:none;margin-bottom:20px">🏠 Back to Tracker</a>
   <div id="mobile-nav-links"></div>
-  <div style="margin-top:20px">
-    <a href="index.html" style="display:flex;align-items:center;gap:8px;background:var(--accent);color:#fff;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;text-decoration:none">← Back to Tracker</a>
-  </div>
 </div>
 
 <!-- MAIN CONTENT -->
@@ -978,7 +980,7 @@ function toggleMobileMenu(){
   d.classList.toggle('open');
   if(d.classList.contains('open')&&!document.getElementById('mobile-nav-links').children.length){
     // Clone sidebar links into mobile drawer
-    document.getElementById('mobile-nav-links').innerHTML=document.getElementById('sidebar').innerHTML.replace(/<a href="index\.html"[\s\S]*?<\/a>/,'');
+    document.getElementById('mobile-nav-links').innerHTML=document.getElementById('sidebar').innerHTML.replace(/<a href="index\.html"[\s\S]*?<\/a>/g,'');
   }
 }
 </script>
