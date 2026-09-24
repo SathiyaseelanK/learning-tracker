@@ -1478,6 +1478,13 @@ async function doLogin(){
       // Only persist the session if "Stay logged in" is checked
       const remember = document.getElementById('remember-me')?.checked !== false;
       if(remember) await saveSession(token);
+      // If the user was bounced here from habits.html to log in, send them
+      // straight back there — one login screen serves the whole app.
+      const goto = new URLSearchParams(location.search).get('goto');
+      if(goto === 'habits'){
+        location.href = 'habits.html';
+        return;
+      }
       // Brief pause so user sees the success message before the app opens
       setTimeout(()=>{ showApp(); resetBtn(); }, 600);
     }
@@ -2753,6 +2760,8 @@ window.onload=async()=>{
         if(res.success){
           loadSheet(res.data||[]);
           setLoadingMsg('✅ Ready!');
+          const goto = new URLSearchParams(location.search).get('goto');
+          if(goto === 'habits'){ location.href = 'habits.html'; return; }
           setTimeout(()=>{
             document.getElementById('loading').style.display='none';
             showApp();

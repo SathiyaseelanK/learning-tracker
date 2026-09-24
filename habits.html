@@ -202,8 +202,11 @@ body.light{--bg:#f0f2f8;--surface:#fff;--surface2:#f5f7fc;--border:#dde2f0;--bor
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="login-screen">
+<!-- LOGIN — kept only as a safety fallback; normally you never see this.
+     Session check happens on load and either shows the app or redirects
+     to the single shared login screen on index.html. Hidden by default
+     so there's no flash of a login form that's about to disappear. -->
+<div id="login-screen" style="display:none">
   <div class="login-card">
     <div class="login-logo">✅</div>
     <div class="login-title">Habit Tracker</div>
@@ -230,7 +233,7 @@ body.light{--bg:#f0f2f8;--surface:#fff;--surface2:#f5f7fc;--border:#dde2f0;--bor
 </div>
 
 <!-- LOADING -->
-<div id="loading" style="display:none">
+<div id="loading" style="display:flex">
   <div class="spin"></div>
   <div id="loading-msg" style="font-size:13px;color:var(--text2);margin-top:4px">Loading…</div>
 </div>
@@ -280,8 +283,8 @@ body.light{--bg:#f0f2f8;--surface:#fff;--surface2:#f5f7fc;--border:#dde2f0;--bor
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
 // ── ENCRYPTED CREDENTIALS (AES-GCM 256-bit, decrypted at login) ────────
-const ENC_URL       = 'Uk/SJMQFnWyQt5ykBOm9REYfO3S/FxnenJNHnjX2gWR59XKL8o4chhO1T7dATKkPByzDNL7QkCsUMloS33aMdoQWZKWfGpMzmBu8/CBmy03ExT3/0xJt8697yFeyRqiI7owA4wp5vO0ddSjkW4xMFKG2/ImiYilU24MDQ647Ma8w3cwZBssXPp5pbdg=';
-const ENC_EMAIL     = 'AqGz5W8eMOsR6anaRemcTGJAN6HijUfQt12k2CzzGOA5k3mb9Jmv1Eb8nEc8/Z5uKgAl';
+const ENC_URL = 'Uk/SJMQFnWyQt5ykBOm9REYfO3S/FxnenJNHnjX2gWR59XKL8o4chhO1T7dATKkPByzDNL7QkCsUMloS33aMdoQWZKWfGpMzmBu8/CBmy03ExT3/0xJt8697yFeyRqiI7owA4wp5vO0ddSjkW4xMFKG2/ImiYilU24MDQ647Ma8w3cwZBssXPp5pbdg=';
+const ENC_EMAIL = 'AqGz5W8eMOsR6anaRemcTGJAN6HijUfQt12k2CzzGOA5k3mb9Jmv1Eb8nEc8/Z5uKgAl';
 const ENC_SERVERKEY = 'vOLIF4vrC1GDhNrlRoNidSUWpsmynD09sltRoxQCcU0Ws6PjyciIGa8kgvE=';
 let WEBAPP_URL    = null;
 let ALLOWED_EMAIL = null;
@@ -1323,7 +1326,10 @@ window.onload=async()=>{
     sessionToken=null;clearSession();
     document.getElementById('loading').style.display='none';
   }
-  document.getElementById('login-token').focus();
+  // No valid session — send to the one shared login screen instead of
+  // showing a second, separate login form here. After logging in there,
+  // index.html sends you straight back to this page automatically.
+  location.href = 'index.html?goto=habits';
 };
 
 function setLoadMsg(msg){
