@@ -538,7 +538,7 @@ Built with:
 
 ## 📄 License
 
-Personal use only. Built specifically for Sathiyaseelan K's learning journey.
+Personal use only. Built specifically for Sathiyaseelan K's learning journey at Accenture.
 
 ---
 

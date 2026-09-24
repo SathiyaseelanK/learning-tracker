@@ -243,10 +243,12 @@ body.light{--bg:#f0f2f8;--surface:#fff;--surface2:#f5f7fc;--border:#dde2f0;--bor
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
 // ── ENCRYPTED CREDENTIALS (AES-GCM 256-bit, decrypted at login) ────────
-const ENC_URL   = '4rz0lmtIU7TQqK9hGGXOC6Wd3odRjAVTdOTdHtLMXchYCLPwoHHP84grixH25qQo0KV3MmdZE6WnipnsxjFbEvmpAQtFSappDQR8EC1NeqEAV6eNtHPD+CbQziQ4GFuB2srANggeL0Fyx8eGLOYfWVRaBMUM3Y0bVUBHOu/tu2uMUdLmyig83Dzvw08=';
-const ENC_EMAIL = 'Qpe56K+LnJpLjFO2CbYuppMXkF95tIAesbsfWLZf3NBeIaIIATuNCUsxCVfhNarPwt6I';
+const ENC_URL       = 'IOALKBoqD9MBHPmHfEehIJn/OSm5t8uvaaakXV6zePT/qrRVVVkCCFu3mo8wyUop0JjEFjdrcHzibfWyyAwOPTnTcsODw5PPcTeESNEuZHibxFCtqV+95DqSupmsZcAcKj7MCr5R2ZlaGPfKF5KnnuXkML+Zqe7UCDSIRlzZz9wAl+YTDYE5xiWflfM=';
+const ENC_EMAIL     = '5cXygkkjP4b63j27k0756bGRWw6FhhRKbOoDywmE6scIFessqBIJE/6RJXM5NFv0CJ8v';
+const ENC_SERVERKEY = 'Ro9cYdygrH8Jeoum6wQo2edtc1GSh/7L89PNusLinZ7xsn24DhpHHFmBdVGh';
 let WEBAPP_URL    = null;
 let ALLOWED_EMAIL = null;
+let SERVER_KEY    = null;
 
 async function deriveKey(passphrase, salt) {
   const enc = new TextEncoder();
@@ -264,12 +266,14 @@ async function aesDecrypt(b64, passphrase, salt) {
 }
 async function decryptCredentials(token) {
   try {
-    const email = await aesDecrypt(ENC_EMAIL, token, token + '_email_salt');
-    const url   = await aesDecrypt(ENC_URL,   token, email);
+    const email     = await aesDecrypt(ENC_EMAIL,     token, token + '_email_salt');
+    const url       = await aesDecrypt(ENC_URL,       token, email);
+    const serverKey = await aesDecrypt(ENC_SERVERKEY, token, email + '_skey');
     WEBAPP_URL    = url;
     ALLOWED_EMAIL = email;
+    SERVER_KEY    = serverKey;
     return true;
-  } catch(e) { WEBAPP_URL = ALLOWED_EMAIL = null; return false; }
+  } catch(e) { WEBAPP_URL = ALLOWED_EMAIL = SERVER_KEY = null; return false; }
 }
 const SESSION_KEY='lt_habit_v1';
 
@@ -305,11 +309,11 @@ function clearSession(){sessionStorage.removeItem(SESSION_KEY);}
 
 // ── API ──────────────────────────────────────────────────────────────
 async function apiGet(){
-  const r=await fetch(`${WEBAPP_URL}?action=get&token=${encodeURIComponent(sessionToken)}`);
+  const r=await fetch(`${WEBAPP_URL}?action=get&token=${encodeURIComponent(SERVER_KEY)}`);
   return r.json();
 }
 async function apiMeta(key,val){
-  return fetch(WEBAPP_URL,{method:'POST',body:JSON.stringify({action:'save',token:sessionToken,moduleId:'meta:'+key,status:val,note:''})}).then(r=>r.json());
+  return fetch(WEBAPP_URL,{method:'POST',body:JSON.stringify({action:'save',token:SERVER_KEY,moduleId:'meta:'+key,status:val,note:''})}).then(r=>r.json());
 }
 function setSyncState(s){
   const d=document.getElementById('sync-dot');
